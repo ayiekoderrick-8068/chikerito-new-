@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INTERACTIVE SHOPPING LIST</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="background-image: url('https://food-ubc.b-cdn.net/wp-content/uploads/2023/04/AdobeStock_255569688-scaled.jpeg'); background-size: cover; background-position: center; background-repeat: no-repeat; margin: 0; padding: 0; min-height: 100vh;">
+    <h1>INTERACTIVE SHOPPING LIST</h1>
+    <div class="input-form">
+        <form id="form">
+        <input type="text" id="item-input" placeholder="Enter an item">
+        <input type="number" id="quantity-input" placeholder="Quantity">
+        <input type="text" id="category-input" placeholder="price">
+        <button id="add-button">Add</button>
+        </form>
+    </div>
+    <section>
+        <ul id="shopping-list"></ul>
+        <h3>TOTAL: ksh<span id="total">0.00</span></h3>
+        <button id="clear-button">Clear List</button>
+    </section>   
+    <script src="script.js"></script>
+    
+</body>
+</html>
