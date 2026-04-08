@@ -1,61 +1,22 @@
-let myItems = JSON.parse(localStorage.getItem("myItems")) || [];
+// this stores all my shopping items
+let myItems = [];
 
-// save items to local storage
-function saveMyItems() {
-    localStorage.setItem("myItems", JSON.stringify(myItems));
-}
-
-// show items on the page
-function showItems() {
-    let list = document.getElementById("shopping-list");
-    let totalDisplay = document.getElementById("total");
-    let total = 0;
-    list.innerHTML = "";
-
-    for (let i = 0; i < myItems.length; i++) {
-        let item = myItems[i];
-
-        // add price if item is bought
-        if (item.purchased == true) {
-            total = total + item.price * item.quantity;
-        }
-
-        let li = document.createElement("li");
-
-        if (item.purchased == true) {
-            li.className = "purchased";
-        } else {
-            li.className = "";
-        }
-
-        li.innerHTML = `
-            <span>${item.name} (x${item.quantity}) - ksh${item.price}</span>
-            <div>
-                <button data-id="${i}" data-action="toggle">Done</button>
-                <button data-id="${i}" data-action="edit">Edit</button>
-                <button data-id="${i}" data-action="delete">Remove</button>
-            </div>
-        `;
-
-        list.appendChild(li);
-    }
-
-    totalDisplay.textContent = total.toFixed(2);
-}
-
-// add new item when form is submitted
+// this runs when i click the add button
 document.getElementById("form").addEventListener("submit", function(e) {
     e.preventDefault();
 
-    let name = document.getElementById("item-input").value.trim();
-    let quantity = parseInt(document.getElementById("quantity-input").value);
-    let price = parseFloat(document.getElementById("category-input").value);
+    // get what the user typed
+    let name = document.getElementById("item-input").value;
+    let quantity = document.getElementById("quantity-input").value;
+    let price = document.getElementById("category-input").value;
 
-    // check if inputs are filled
-    if (name == "" || isNaN(quantity) || isNaN(price)) {
+    // dont add if fields are empty
+    if (name == "" || quantity == "" || price == "") {
+        alert("Please fill in all fields");
         return;
     }
 
+    // create a new item and add it to the list
     let newItem = {
         name: name,
         quantity: quantity,
@@ -64,46 +25,52 @@ document.getElementById("form").addEventListener("submit", function(e) {
     };
 
     myItems.push(newItem);
-    saveMyItems();
     showItems();
     e.target.reset();
 });
 
-// handle button clicks on list
-document.getElementById("shopping-list").addEventListener("click", function(e) {
-    let id = e.target.dataset.id;
-    let action = e.target.dataset.action;
+// this shows all items on the page
+function showItems() {
+    let list = document.getElementById("shopping-list");
+    let total = 0;
+    list.innerHTML = "";
 
-    if (action == "toggle") {
-        myItems[id].purchased = !myItems[id].purchased;
-    }
+    for (let i = 0; i < myItems.length; i++) {
+        let item = myItems[i];
 
-    if (action == "delete") {
-        myItems.splice(id, 1);
-    }
+        // create a list item
+        let li = document.createElement("li");
+        li.innerHTML = item.name + " (x" + item.quantity + ") - ksh" + item.price +
+            ' <button onclick="removeItem(' + i + ')">Remove</button>' +
+            ' <button onclick="markDone(' + i + ')">Done</button>';
 
-    if (action == "edit") {
-        let newName = prompt("Enter new name:", myItems[id].name);
-        let newQty = prompt("Enter new quantity:", myItems[id].quantity);
-        let newPrice = prompt("Enter new price:", myItems[id].price);
-
-        if (newName != null && newQty != null && newPrice != null) {
-            myItems[id].name = newName;
-            myItems[id].quantity = parseInt(newQty);
-            myItems[id].price = parseFloat(newPrice);
+        // if item is done change its look
+        if (item.purchased == true) {
+            li.style.textDecoration = "line-through";
+            total = total + (item.price * item.quantity);
         }
+
+        list.appendChild(li);
     }
 
-    saveMyItems();
-    showItems();
-});
+    // show total
+    document.getElementById("total").textContent = total;
+}
 
-// clear all items
+// this removes an item
+function removeItem(i) {
+    myItems.splice(i, 1);
+    showItems();
+}
+
+// this marks item as done
+function markDone(i) {
+    myItems[i].purchased = true;
+    showItems();
+}
+
+// this clears everything
 document.getElementById("clear-button").addEventListener("click", function() {
     myItems = [];
-    saveMyItems();
     showItems();
 });
-
-// load items when page opens
-showItems();
