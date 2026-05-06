@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Dictionary</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <h1>Simple Dictionary</h1>
+        <p class="tagline">Learn new words every day</p>
+
+        <div class="search-box">
+            <input type="text" id="wordInput" placeholder="Type a word... (e.g., happy, love, beautiful)">
+            <button id="searchBtn">Search</button>
+        </div>
+
+        <div id="result" class="result-card" style="display: none;"></div>
+
+        <div class="saved-section">
+            <div class="saved-header">
+                <h3>My Saved Words</h3>
+                <button id="clearAllBtn" class="small-btn">Clear All</button>
+            </div>
+            <div id="savedList" class="saved-words"></div>
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>
