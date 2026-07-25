@@ -1,0 +1,23 @@
+# Never track credentials, caches, or tool state from the home directory
+.aws/
+.ssh/
+.gnupg/
+.cache/
+.config/
+.local/
+.npm/
+.nvm/
+.pyenv/
+.net/
+.claude/
+.claude.json
+.copilot/
+.gemini/
+.ghcp-appmod/
+.qodo/
+.vscode-server/
+.vscode-remote-containers/
+.bash_history
+.bashrc
+.wsl-config
+node_modules/
