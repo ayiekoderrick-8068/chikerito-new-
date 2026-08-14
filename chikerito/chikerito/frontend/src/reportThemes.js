@@ -1,0 +1,98 @@
+// Decorative theme presets for the shareable milestone progress report, keyed by
+// the same milestone_type values used in LifeSpaces.jsx.
+export const REPORT_THEMES = {
+  wedding: {
+    label: "Wedding Fund Progress",
+    accent: "#7c5cbf",
+    accentSoft: "#a586d9",
+    bg: "linear-gradient(135deg, #f6f1fb 0%, #efe6f9 100%)",
+    corner: "💐",
+    icon: "💍",
+    footerIcon: "🏆",
+  },
+  graduation: {
+    label: "Graduation Fund Progress",
+    accent: "#1f4fa3",
+    accentSoft: "#4472c4",
+    bg: "linear-gradient(135deg, #eef3fc 0%, #e2ecfa 100%)",
+    corner: "🎓",
+    icon: "📜",
+    footerIcon: "🏆",
+  },
+  medical: {
+    label: "Medical Fund Progress",
+    accent: "#2f9e63",
+    accentSoft: "#5cbf8a",
+    bg: "linear-gradient(135deg, #eefaf3 0%, #e2f5ea 100%)",
+    corner: "❤️",
+    icon: "🩺",
+    footerIcon: "🙏",
+  },
+  business: {
+    label: "Business Fund Progress",
+    accent: "#b08d57",
+    accentSoft: "#d4b483",
+    bg: "linear-gradient(135deg, #fbf7ef 0%, #f5ecd9 100%)",
+    corner: "💼",
+    icon: "🚀",
+    footerIcon: "🏆",
+  },
+  baby_shower: {
+    label: "Baby Shower Fund Progress",
+    accent: "#e08bb0",
+    accentSoft: "#f0b8cf",
+    bg: "linear-gradient(135deg, #fdf1f6 0%, #fbe6ee 100%)",
+    corner: "👶",
+    icon: "🍼",
+    footerIcon: "🎉",
+  },
+  home: {
+    label: "New Home Fund Progress",
+    accent: "#c97a2b",
+    accentSoft: "#e2a35f",
+    bg: "linear-gradient(135deg, #fdf3ea 0%, #f9e5d0 100%)",
+    corner: "🏡",
+    icon: "🔑",
+    footerIcon: "🏆",
+  },
+  travel: {
+    label: "Travel Fund Progress",
+    accent: "#2a9d8f",
+    accentSoft: "#5fc4b7",
+    bg: "linear-gradient(135deg, #eafaf8 0%, #dcf3f0 100%)",
+    corner: "✈️",
+    icon: "🧳",
+    footerIcon: "🌍",
+  },
+  birthday: {
+    label: "Birthday Fund Progress",
+    accent: "#c9457a",
+    accentSoft: "#e37aa2",
+    bg: "linear-gradient(135deg, #fdf0f5 0%, #fbe3ed 100%)",
+    corner: "🎂",
+    icon: "🎈",
+    footerIcon: "🎉",
+  },
+  community: {
+    label: "Community Project Progress",
+    accent: "#1f7a4d",
+    accentSoft: "#4fa87a",
+    bg: "linear-gradient(135deg, #eef8f1 0%, #e0f1e6 100%)",
+    corner: "🌍",
+    icon: "🤝",
+    footerIcon: "🏆",
+  },
+  custom: {
+    label: "Milestone Fund Progress",
+    accent: "#1b2a4a",
+    accentSoft: "#4472c4",
+    bg: "linear-gradient(135deg, #eef1f8 0%, #e4e9f4 100%)",
+    corner: "✨",
+    icon: "🎯",
+    footerIcon: "🏆",
+  },
+};
+
+export function getReportTheme(milestoneType) {
+  return REPORT_THEMES[milestoneType] || REPORT_THEMES.custom;
+}

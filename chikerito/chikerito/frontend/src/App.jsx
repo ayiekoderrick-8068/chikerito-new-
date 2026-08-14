@@ -1,0 +1,66 @@
+import { Routes, Route } from "react-router-dom";
+import Landing from "./pages/Landing.jsx";
+import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
+import DonatePage from "./pages/DonatePage.jsx";
+import PublicReport from "./pages/PublicReport.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import Sidebar from "./components/Sidebar.jsx";
+import { LifeSpaceProvider } from "./context/LifeSpaceContext.jsx";
+
+import Dashboard from "./pages/Dashboard.jsx";
+import LifeSpaces from "./pages/LifeSpaces.jsx";
+import Planning from "./pages/Planning.jsx";
+import FinanceHub from "./pages/FinanceHub.jsx";
+import BudgetSpreadsheet from "./pages/BudgetSpreadsheet.jsx";
+import ExpenseTracker from "./pages/ExpenseTracker.jsx";
+import Contributions from "./pages/Contributions.jsx";
+import Analytics from "./pages/Analytics.jsx";
+import Team from "./pages/Team.jsx";
+import Settings from "./pages/Settings.jsx";
+import Report from "./pages/Report.jsx";
+
+function AppShell() {
+  return (
+    <LifeSpaceProvider>
+      <div className="app-shell">
+        <Sidebar />
+        <div className="main-area">
+          <Routes>
+            <Route index element={<Dashboard />} />
+            <Route path="life-spaces" element={<LifeSpaces />} />
+            <Route path="planning" element={<Planning />} />
+            <Route path="finance" element={<FinanceHub />} />
+            <Route path="budget-spreadsheet" element={<BudgetSpreadsheet />} />
+            <Route path="expenses" element={<ExpenseTracker />} />
+            <Route path="contributions" element={<Contributions />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="team" element={<Team />} />
+            <Route path="report" element={<Report />} />
+            <Route path="settings" element={<Settings />} />
+          </Routes>
+        </div>
+      </div>
+    </LifeSpaceProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/donate/:slug" element={<DonatePage />} />
+      <Route path="/report/:slug" element={<PublicReport />} />
+      <Route
+        path="/app/*"
+        element={
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  );
+}
