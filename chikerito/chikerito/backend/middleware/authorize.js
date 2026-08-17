@@ -95,6 +95,24 @@ function requireResourceCapability(table, capability, idParam = "id") {
   };
 }
 
+// Same resolution as requireResourceCapability, but for actions any member
+// may take regardless of role (e.g. marking a notification read/dismissing
+// it) — no capability check, just membership.
+function requireResourceMember(table, idParam = "id") {
+  return (req, res, next) => {
+    const resource = db.table(table).find(req.params[idParam]);
+    if (!resource) return res.status(404).json({ error: "Not found" });
+    const lifeSpace = db.table("life_spaces").find(resource.life_space_id);
+    if (!lifeSpace) return res.status(404).json({ error: "Not found" });
+    const role = roleFor(lifeSpace, req.user.id);
+    if (!role) return res.status(403).json({ error: "You do not have access to this life space" });
+    req.resource = resource;
+    req.lifeSpace = lifeSpace;
+    req.role = role;
+    next();
+  };
+}
+
 module.exports = {
   ROLES,
   INVITABLE_ROLES,
@@ -104,4 +122,5 @@ module.exports = {
   requireMember,
   requireCapability,
   requireResourceCapability,
+  requireResourceMember,
 };
