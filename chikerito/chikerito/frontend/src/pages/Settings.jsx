@@ -5,6 +5,7 @@ import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
 import { fileToResizedDataUrl } from "../imageUtils.js";
 import { can } from "../permissions.js";
+import SecuritySettings from "../components/SecuritySettings.jsx";
 
 export default function Settings() {
   const { current, refresh } = useLifeSpace();
@@ -43,31 +44,6 @@ export default function Settings() {
     }
   }
 
-  if (!current) {
-    return (
-      <>
-        <Topbar title="Settings" />
-        <div className="page-body"><div className="empty-state card">Create a Life Space to manage its settings.</div></div>
-      </>
-    );
-  }
-
-  if (!canEditSettings) {
-    return (
-      <>
-        <Topbar title="Settings" />
-        <div className="page-body">
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Life Space Settings</h3>
-            <p style={{ color: "var(--text-muted)" }}>Your role ({current.role.replace("_", " ")}) doesn't include editing this life space's settings.</p>
-            <p><strong>Title:</strong> {current.title}</p>
-            <p><strong>Visibility:</strong> {current.visibility}</p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
   async function handleSave(e) {
     e.preventDefault();
     setError("");
@@ -97,18 +73,30 @@ export default function Settings() {
     }
   }
 
-  const shareUrl = `${window.location.origin}/donate/${current.slug}`;
+  const shareUrl = current ? `${window.location.origin}/donate/${current.slug}` : "";
 
-  return (
-    <>
-      <Topbar title="Settings" />
-      <div className="page-body">
-        <div className="two-col">
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Life Space Settings</h3>
-            {saved && <div className="success-banner">Settings saved.</div>}
-            {error && <div className="error-banner">{error}</div>}
-            <form onSubmit={handleSave}>
+  function renderLifeSpacePanel() {
+    if (!current) {
+      return <div className="empty-state card">Create a Life Space to manage its settings.</div>;
+    }
+
+    if (!canEditSettings) {
+      return (
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Life Space Settings</h3>
+          <p style={{ color: "var(--text-muted)" }}>Your role ({current.role.replace("_", " ")}) doesn't include editing this life space's settings.</p>
+          <p><strong>Title:</strong> {current.title}</p>
+          <p><strong>Visibility:</strong> {current.visibility}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Life Space Settings</h3>
+        {saved && <div className="success-banner">Settings saved.</div>}
+        {error && <div className="error-banner">{error}</div>}
+        <form onSubmit={handleSave}>
               <div className="field">
                 <label>Title</label>
                 <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -193,14 +181,26 @@ export default function Settings() {
               <button className="btn btn-primary" style={{ marginTop: 20 }} disabled={saving}>{saving ? "Saving..." : "Save Changes"}</button>
             </form>
           </div>
+    );
+  }
 
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Account</h3>
-            <p><strong>Name:</strong> {user?.firstName} {user?.lastName}</p>
-            <p><strong>Email:</strong> {user?.email}</p>
-            <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 20 }}>
-              Chikerito — The Operating System for Life's Biggest Moments.
-            </p>
+  return (
+    <>
+      <Topbar title="Settings" />
+      <div className="page-body">
+        <div className="two-col">
+          {renderLifeSpacePanel()}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div className="card">
+              <h3 style={{ marginTop: 0 }}>Account</h3>
+              <p><strong>Name:</strong> {user?.firstName} {user?.lastName}</p>
+              <p><strong>Email:</strong> {user?.email}</p>
+              <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 20 }}>
+                Chikerito — The Operating System for Life's Biggest Moments.
+              </p>
+            </div>
+            <SecuritySettings />
           </div>
         </div>
       </div>
