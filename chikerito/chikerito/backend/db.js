@@ -13,6 +13,8 @@ const DEFAULT_DB_FILE = path.join(__dirname, "data", "db.json");
 
 const EMPTY = {
   users: [],
+  sessions: [],
+  password_resets: [],
   life_spaces: [],
   team_members: [],
   invitations: [],

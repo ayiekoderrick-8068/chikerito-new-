@@ -12,6 +12,25 @@ CREATE TABLE users (
   created_at    TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE sessions (
+  id            UUID PRIMARY KEY, -- also embedded as the JWT's `sid` claim; revoking a row invalidates that token
+  user_id       UUID REFERENCES users(id),
+  user_agent    VARCHAR(500),
+  created_at    TIMESTAMP DEFAULT now(),
+  last_seen_at  TIMESTAMP DEFAULT now(),
+  revoked_at    TIMESTAMP
+);
+
+CREATE TABLE password_resets (
+  id            UUID PRIMARY KEY,
+  user_id       UUID REFERENCES users(id),
+  token_hash    VARCHAR(64) NOT NULL, -- sha256 hex digest of the raw token; the raw token is never stored
+  status        VARCHAR(20) DEFAULT 'pending', -- pending | used | revoked (expiry is derived from expires_at, not stored)
+  created_at    TIMESTAMP DEFAULT now(),
+  expires_at    TIMESTAMP NOT NULL,
+  used_at       TIMESTAMP
+);
+
 CREATE TABLE life_spaces (
   id             UUID PRIMARY KEY,
   owner_id       UUID REFERENCES users(id),
