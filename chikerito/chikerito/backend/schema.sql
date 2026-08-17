@@ -39,6 +39,18 @@ CREATE TABLE team_members (
   invited_at    TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE invitations (
+  id            UUID PRIMARY KEY,
+  life_space_id UUID REFERENCES life_spaces(id),
+  email         VARCHAR(255) NOT NULL,
+  role          VARCHAR(30) NOT NULL, -- finance_manager | event_planner | volunteer | editor — never owner
+  status        VARCHAR(20) DEFAULT 'pending', -- pending | accepted | declined | revoked (expiry is derived from expires_at, not stored)
+  invited_by    UUID REFERENCES users(id),
+  invited_at    TIMESTAMP DEFAULT now(),
+  expires_at    TIMESTAMP NOT NULL,
+  responded_at  TIMESTAMP
+);
+
 CREATE TABLE budget_categories (
   id            UUID PRIMARY KEY,
   life_space_id UUID REFERENCES life_spaces(id),

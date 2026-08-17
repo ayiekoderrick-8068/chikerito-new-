@@ -15,6 +15,7 @@ const EMPTY = {
   users: [],
   life_spaces: [],
   team_members: [],
+  invitations: [],
   budget_categories: [],
   contributions: [],
   expenses: [],

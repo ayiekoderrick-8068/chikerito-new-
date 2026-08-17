@@ -112,22 +112,10 @@ router.get("/:id/team", requireAuth, requireMember("id"), (req, res) => {
   res.json({ team: withNames });
 });
 
-router.post("/:id/team", requireAuth, requireCapability("team:manage", "id"), (req, res) => {
-  const { email, role } = req.body;
-  if (role !== undefined && !INVITABLE_ROLES.includes(role)) {
-    return res.status(400).json({ error: `role must be one of: ${INVITABLE_ROLES.join(", ")}` });
-  }
-  const user = db.table("users").where((u) => u.email.toLowerCase() === (email || "").toLowerCase())[0];
-  if (!user) return res.status(404).json({ error: "No user found with that email" });
-  const member = db.table("team_members").insert({
-    id: uuid(),
-    life_space_id: req.params.id,
-    user_id: user.id,
-    role: role || "volunteer",
-    invited_at: new Date().toISOString(),
-  });
-  res.status(201).json({ member });
-});
+// Adding a new member now goes through the pending-invitation lifecycle
+// (see routes/invitations.js: POST /lifespaces/:id/invitations) instead of
+// this granting membership immediately — a real invite flow needs a state
+// the invitee can accept or decline, which immediate grant can't represent.
 
 router.patch("/:id/team/:memberId", requireAuth, requireCapability("team:manage", "id"), (req, res) => {
   const { role } = req.body;

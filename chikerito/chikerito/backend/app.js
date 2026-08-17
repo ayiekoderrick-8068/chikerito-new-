@@ -14,6 +14,7 @@ const dashboardRoutes = require("./routes/dashboard");
 const reportRoutes = require("./routes/report");
 const taskRoutes = require("./routes/tasks");
 const notificationRoutes = require("./routes/notifications");
+const invitationRoutes = require("./routes/invitations");
 
 function createApp() {
   const app = express();
@@ -32,6 +33,7 @@ function createApp() {
   app.use("/api", reportRoutes);       // /api/public/lifespaces/:slug/report
   app.use("/api", taskRoutes);         // /api/lifespaces/:id/tasks, /api/tasks/:id
   app.use("/api", notificationRoutes); // /api/lifespaces/:id/notifications, /api/notifications/:id
+  app.use("/api", invitationRoutes);   // /api/lifespaces/:id/invitations, /api/invitations/:id/accept|decline, /api/invitations/pending
 
   app.use((req, res) => res.status(404).json({ error: "Not found" }));
 
