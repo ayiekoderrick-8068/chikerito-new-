@@ -77,6 +77,19 @@ export const api = {
   createTask: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/tasks`, { method: "POST", body: payload }),
   updateTask: (id, payload) => request(`/tasks/${id}`, { method: "PATCH", body: payload }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: "DELETE" }),
+
+  listNotifications: (lifeSpaceId, { unreadOnly, before, limit } = {}) => {
+    const params = new URLSearchParams();
+    if (unreadOnly) params.set("unreadOnly", "true");
+    if (before) params.set("before", before);
+    if (limit) params.set("limit", limit);
+    const qs = params.toString();
+    return request(`/lifespaces/${lifeSpaceId}/notifications${qs ? `?${qs}` : ""}`);
+  },
+  getUnreadNotificationCount: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/notifications/unread-count`),
+  markAllNotificationsRead: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/notifications/mark-all-read`, { method: "POST" }),
+  setNotificationRead: (id, read) => request(`/notifications/${id}`, { method: "PATCH", body: { read } }),
+  deleteNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
 };
 
 export { getToken };
