@@ -25,7 +25,7 @@ const expenses = [
 
 describe("ExpenseTracker", () => {
   beforeEach(() => {
-    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1" });
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1", role: "owner" } });
     api.listExpenses.mockResolvedValue({ expenses });
     api.listCategories.mockResolvedValue({ categories });
   });
@@ -101,5 +101,37 @@ describe("ExpenseTracker", () => {
 
     expect(window.confirm).toHaveBeenCalled();
     expect(api.deleteExpense).not.toHaveBeenCalled();
+  });
+});
+
+describe("ExpenseTracker — role-based guards", () => {
+  beforeEach(() => {
+    api.listExpenses.mockResolvedValue({ expenses });
+    api.listCategories.mockResolvedValue({ categories });
+  });
+
+  it("hides Record Expense and per-row delete for a role without expense:manage", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1", role: "volunteer" } });
+    renderPage();
+    await screen.findByText("Grand Hall");
+
+    expect(screen.queryByRole("button", { name: /record expense/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "✕" })).not.toBeInTheDocument();
+  });
+
+  it("shows the manage controls for finance_manager, which has expense:manage", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1", role: "finance_manager" } });
+    renderPage();
+    await screen.findByText("Grand Hall");
+
+    expect(screen.getByRole("button", { name: /record expense/i })).toBeInTheDocument();
+  });
+
+  it("hides the manage controls for event_planner, which does not have expense:manage", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1", role: "event_planner" } });
+    renderPage();
+    await screen.findByText("Grand Hall");
+
+    expect(screen.queryByRole("button", { name: /record expense/i })).not.toBeInTheDocument();
   });
 });

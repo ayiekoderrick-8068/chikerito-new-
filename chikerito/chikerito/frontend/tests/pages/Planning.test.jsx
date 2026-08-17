@@ -26,7 +26,7 @@ const tasks = [
 describe("Planning", () => {
   beforeEach(() => {
     vi.setSystemTime(new Date("2026-06-15T00:00:00.000Z"));
-    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1" });
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1", role: "owner" } });
   });
 
   afterEach(() => {
@@ -113,5 +113,42 @@ describe("Planning", () => {
 
     expect(window.confirm).toHaveBeenCalled();
     await waitFor(() => expect(api.deleteTask).toHaveBeenCalledWith("t1"));
+  });
+});
+
+describe("Planning — role-based guards", () => {
+  beforeEach(() => {
+    vi.setSystemTime(new Date("2026-06-15T00:00:00.000Z"));
+    api.listTasks.mockResolvedValue({ tasks });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("hides Add Task and delete, and disables the checkbox, for a role without task:manage", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1", role: "volunteer" } });
+    renderPage();
+    const row = (await screen.findByText("Book venue")).closest("li");
+
+    expect(screen.queryByRole("button", { name: /add task/i })).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "✕" })).not.toBeInTheDocument();
+    expect(within(row).getByRole("checkbox")).toBeDisabled();
+  });
+
+  it("shows the manage controls for event_planner, which has task:manage", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1", role: "event_planner" } });
+    renderPage();
+    await screen.findByText("Book venue");
+
+    expect(screen.getByRole("button", { name: /add task/i })).toBeInTheDocument();
+  });
+
+  it("hides the manage controls for finance_manager, which does not have task:manage", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1", role: "finance_manager" } });
+    renderPage();
+    await screen.findByText("Book venue");
+
+    expect(screen.queryByRole("button", { name: /add task/i })).not.toBeInTheDocument();
   });
 });
