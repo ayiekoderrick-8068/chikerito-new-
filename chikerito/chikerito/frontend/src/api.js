@@ -68,6 +68,10 @@ export const api = {
 
   listTeam: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/team`),
   inviteTeam: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/team`, { method: "POST", body: payload }),
+  updateTeamMemberRole: (lifeSpaceId, memberId, role) =>
+    request(`/lifespaces/${lifeSpaceId}/team/${memberId}`, { method: "PATCH", body: { role } }),
+  removeTeamMember: (lifeSpaceId, memberId) =>
+    request(`/lifespaces/${lifeSpaceId}/team/${memberId}`, { method: "DELETE" }),
 
   listTasks: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/tasks`),
   createTask: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/tasks`, { method: "POST", body: payload }),
