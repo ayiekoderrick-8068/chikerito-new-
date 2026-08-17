@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
+import { can } from "../permissions.js";
 
-function EditableAmount({ value, onSave }) {
+function EditableAmount({ value, onSave, readOnly }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value);
 
@@ -15,6 +16,10 @@ function EditableAmount({ value, onSave }) {
     setEditing(false);
     const next = Number(val) || 0;
     if (next !== Number(value)) onSave(next);
+  }
+
+  if (readOnly) {
+    return <span>${Number(value).toLocaleString()}</span>;
   }
 
   if (!editing) {
@@ -83,6 +88,8 @@ function NewLineRow({ onAdd }) {
 
 export default function BudgetSpreadsheet() {
   const { currentId, current } = useLifeSpace();
+  const canManageCategories = can(current?.role, "category:manage");
+  const canManageExpenses = can(current?.role, "expense:manage");
   const [categories, setCategories] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -220,7 +227,7 @@ export default function BudgetSpreadsheet() {
           <div>
             <span className="cat-name">{cat.name}</span>
             <span className="budget-pill">
-              Budget: <EditableAmount value={cat.budget_amount} onSave={(v) => api.updateCategory(cat.id, { budgetAmount: v }).then(load)} />
+              Budget: <EditableAmount value={cat.budget_amount} readOnly={!canManageCategories} onSave={(v) => api.updateCategory(cat.id, { budgetAmount: v }).then(load)} />
             </span>
             <span className="budget-pill muted">Raised: ${cat.raised.toLocaleString()}</span>
             <span className="budget-pill muted">Planned: ${planned.toLocaleString()}</span>
@@ -228,9 +235,11 @@ export default function BudgetSpreadsheet() {
               {variance < 0 ? "Over by" : "Remaining"}: ${Math.abs(variance).toLocaleString()}
             </span>
           </div>
-          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleDeleteCategory(cat.id)}>
-            Delete category ✕
-          </button>
+          {canManageCategories && (
+            <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleDeleteCategory(cat.id)}>
+              Delete category ✕
+            </button>
+          )}
         </div>
 
         <table className="table spreadsheet-table">
@@ -241,7 +250,7 @@ export default function BudgetSpreadsheet() {
               <th>Actual</th>
               <th>Variance</th>
               <th>Status</th>
-              <th></th>
+              {canManageExpenses && <th></th>}
             </tr>
           </thead>
           <tbody>
@@ -251,28 +260,34 @@ export default function BudgetSpreadsheet() {
                 <tr key={e.id}>
                   <td>{e.vendor}</td>
                   <td>
-                    <EditableAmount value={e.planned_amount} onSave={(v) => handleLineUpdate(e.id, { plannedAmount: v })} />
+                    <EditableAmount value={e.planned_amount} readOnly={!canManageExpenses} onSave={(v) => handleLineUpdate(e.id, { plannedAmount: v })} />
                   </td>
                   <td>
-                    <EditableAmount value={e.amount} onSave={(v) => handleLineUpdate(e.id, { amount: v, status: v > 0 ? (e.status === "pending" ? "paid" : e.status) : e.status })} />
+                    <EditableAmount value={e.amount} readOnly={!canManageExpenses} onSave={(v) => handleLineUpdate(e.id, { amount: v, status: v > 0 ? (e.status === "pending" ? "paid" : e.status) : e.status })} />
                   </td>
                   <td className={lineVariance < 0 ? "text-danger" : "text-muted"}>
                     {lineVariance < 0 ? "-" : ""}${Math.abs(lineVariance).toLocaleString()}
                   </td>
                   <td>
-                    <select className="status-select" value={e.status} onChange={(ev) => handleLineUpdate(e.id, { status: ev.target.value })}>
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
-                      <option value="overdue">Overdue</option>
-                    </select>
+                    {canManageExpenses ? (
+                      <select className="status-select" value={e.status} onChange={(ev) => handleLineUpdate(e.id, { status: ev.target.value })}>
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="overdue">Overdue</option>
+                      </select>
+                    ) : (
+                      <span className="badge badge-neutral">{e.status}</span>
+                    )}
                   </td>
-                  <td>
-                    <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleDeleteLine(e.id)}>✕</button>
-                  </td>
+                  {canManageExpenses && (
+                    <td>
+                      <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleDeleteLine(e.id)}>✕</button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
-            <NewLineRow onAdd={(payload) => handleAddLine(cat.id, payload)} />
+            {canManageExpenses && <NewLineRow onAdd={(payload) => handleAddLine(cat.id, payload)} />}
           </tbody>
         </table>
       </div>
@@ -294,7 +309,7 @@ export default function BudgetSpreadsheet() {
           <h3 style={{ margin: 0, color: "var(--navy)" }}>Plan vs. Actual, by Category</h3>
           <div style={{ display: "flex", gap: 10 }}>
             <button className="btn btn-outline btn-sm" onClick={exportCsv}>Export CSV</button>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Add Category</button>
+            {canManageCategories && <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Add Category</button>}
           </div>
         </div>
 
@@ -313,7 +328,7 @@ export default function BudgetSpreadsheet() {
             </div>
             <table className="table spreadsheet-table">
               <thead>
-                <tr><th>Line item</th><th>Planned</th><th>Actual</th><th>Variance</th><th>Status</th><th></th></tr>
+                <tr><th>Line item</th><th>Planned</th><th>Actual</th><th>Variance</th><th>Status</th>{canManageExpenses && <th></th>}</tr>
               </thead>
               <tbody>
                 {uncategorized.map((e) => {
@@ -321,17 +336,23 @@ export default function BudgetSpreadsheet() {
                   return (
                     <tr key={e.id}>
                       <td>{e.vendor}</td>
-                      <td><EditableAmount value={e.planned_amount} onSave={(v) => handleLineUpdate(e.id, { plannedAmount: v })} /></td>
-                      <td><EditableAmount value={e.amount} onSave={(v) => handleLineUpdate(e.id, { amount: v })} /></td>
+                      <td><EditableAmount value={e.planned_amount} readOnly={!canManageExpenses} onSave={(v) => handleLineUpdate(e.id, { plannedAmount: v })} /></td>
+                      <td><EditableAmount value={e.amount} readOnly={!canManageExpenses} onSave={(v) => handleLineUpdate(e.id, { amount: v })} /></td>
                       <td className={lineVariance < 0 ? "text-danger" : "text-muted"}>{lineVariance < 0 ? "-" : ""}${Math.abs(lineVariance).toLocaleString()}</td>
                       <td>
-                        <select className="status-select" value={e.status} onChange={(ev) => handleLineUpdate(e.id, { status: ev.target.value })}>
-                          <option value="pending">Pending</option>
-                          <option value="paid">Paid</option>
-                          <option value="overdue">Overdue</option>
-                        </select>
+                        {canManageExpenses ? (
+                          <select className="status-select" value={e.status} onChange={(ev) => handleLineUpdate(e.id, { status: ev.target.value })}>
+                            <option value="pending">Pending</option>
+                            <option value="paid">Paid</option>
+                            <option value="overdue">Overdue</option>
+                          </select>
+                        ) : (
+                          <span className="badge badge-neutral">{e.status}</span>
+                        )}
                       </td>
-                      <td><button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleDeleteLine(e.id)}>✕</button></td>
+                      {canManageExpenses && (
+                        <td><button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleDeleteLine(e.id)}>✕</button></td>
+                      )}
                     </tr>
                   );
                 })}

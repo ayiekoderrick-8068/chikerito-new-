@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
+import { can } from "../permissions.js";
 
 const CATEGORY_SUGGESTIONS = [
   "Venue", "Photography", "Cake", "Dress", "Decor", "Music",
@@ -28,23 +29,26 @@ function relativeLabel(dateStr) {
   return abs < 30 ? `${abs} day${abs > 1 ? "s" : ""} overdue` : `${months} month${months > 1 ? "s" : ""} overdue`;
 }
 
-function TaskRow({ task, onToggle, onDelete }) {
+function TaskRow({ task, onToggle, onDelete, canManage }) {
   const overdue = !task.completed && task.due_date && task.due_date < todayStr();
   return (
     <li className={`task-row ${task.completed ? "completed" : ""}`}>
       <label className="task-checkbox-label">
-        <input type="checkbox" checked={task.completed} onChange={() => onToggle(task)} />
+        <input type="checkbox" checked={task.completed} disabled={!canManage} onChange={() => canManage && onToggle(task)} />
         <span className="task-title">{task.title}</span>
       </label>
       <span className="category-badge">{task.category}</span>
       {task.due_date && <span className={`relative-date ${overdue ? "overdue" : ""}`}>{relativeLabel(task.due_date)}</span>}
-      <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => onDelete(task.id)}>✕</button>
+      {canManage && (
+        <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => onDelete(task.id)}>✕</button>
+      )}
     </li>
   );
 }
 
 export default function Planning() {
-  const { currentId } = useLifeSpace();
+  const { currentId, current } = useLifeSpace();
+  const canManage = can(current?.role, "task:manage");
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("timeline");
@@ -137,7 +141,7 @@ export default function Planning() {
             <button className={`btn btn-sm ${view === "timeline" ? "btn-primary" : "btn-outline"}`} onClick={() => setView("timeline")}>Timeline</button>
             <button className={`btn btn-sm ${view === "checklist" ? "btn-primary" : "btn-outline"}`} onClick={() => setView("checklist")} style={{ marginLeft: 8 }}>Checklist</button>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Add Task</button>
+          {canManage && <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Add Task</button>}
         </div>
 
         {loading ? (
@@ -150,7 +154,7 @@ export default function Planning() {
               <div className="card timeline-month" key={month}>
                 <h3>{monthLabel(items[0].due_date)}</h3>
                 <ul className="task-list">
-                  {items.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} />)}
+                  {items.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} canManage={canManage} />)}
                 </ul>
               </div>
             ))}
@@ -158,7 +162,7 @@ export default function Planning() {
               <div className="card timeline-month">
                 <h3>No due date</h3>
                 <ul className="task-list">
-                  {timelineGroups.noDate.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} />)}
+                  {timelineGroups.noDate.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} canManage={canManage} />)}
                 </ul>
               </div>
             )}
@@ -174,7 +178,7 @@ export default function Planning() {
                 </div>
                 <div className="progress-track"><div className="progress-fill blue" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} /></div>
                 <ul className="task-list">
-                  {items.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} />)}
+                  {items.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} canManage={canManage} />)}
                 </ul>
               </div>
             );

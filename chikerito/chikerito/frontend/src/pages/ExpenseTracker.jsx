@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
+import { can } from "../permissions.js";
 
 export default function ExpenseTracker() {
-  const { currentId } = useLifeSpace();
+  const { currentId, current } = useLifeSpace();
+  const canManage = can(current?.role, "expense:manage");
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,9 +70,11 @@ export default function ExpenseTracker() {
     <>
       <Topbar title="Expense Tracker" />
       <div className="page-body">
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Record Expense</button>
-        </div>
+        {canManage && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Record Expense</button>
+          </div>
+        )}
 
         <div className="card">
           {loading ? (
@@ -81,7 +85,7 @@ export default function ExpenseTracker() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Vendor</th><th>Category</th><th>Amount</th><th>Payment Date</th><th>Status</th><th>Receipt</th><th></th>
+                  <th>Vendor</th><th>Category</th><th>Amount</th><th>Payment Date</th><th>Status</th><th>Receipt</th>{canManage && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -97,9 +101,11 @@ export default function ExpenseTracker() {
                       </span>
                     </td>
                     <td>{e.receipt_url ? "✅" : "—"}</td>
-                    <td>
-                      <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleDelete(e.id)}>✕</button>
-                    </td>
+                    {canManage && (
+                      <td>
+                        <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleDelete(e.id)}>✕</button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
