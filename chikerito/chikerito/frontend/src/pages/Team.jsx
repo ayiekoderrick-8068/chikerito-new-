@@ -6,11 +6,20 @@ import { can } from "../permissions.js";
 
 const ROLES = ["finance_manager", "event_planner", "volunteer", "editor"];
 
+function formatExpiry(iso) {
+  const days = Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+  if (days <= 0) return "expires today";
+  if (days === 1) return "expires in 1 day";
+  return `expires in ${days} days`;
+}
+
 export default function Team() {
   const { currentId, current } = useLifeSpace();
   const canManage = can(current?.role, "team:manage");
   const [team, setTeam] = useState([]);
+  const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState({ email: "", role: "volunteer" });
   const [error, setError] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -19,9 +28,19 @@ export default function Team() {
   async function load() {
     if (!currentId) return;
     setLoading(true);
-    const { team } = await api.listTeam(currentId);
-    setTeam(team);
-    setLoading(false);
+    setLoadError("");
+    try {
+      const [{ team }, { invitations }] = await Promise.all([
+        api.listTeam(currentId),
+        api.listInvitations(currentId),
+      ]);
+      setTeam(team);
+      setInvitations(invitations);
+    } catch (err) {
+      setLoadError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -34,13 +53,24 @@ export default function Team() {
     setError("");
     setInviting(true);
     try {
-      await api.inviteTeam(currentId, form);
+      await api.createInvitation(currentId, form);
       setForm({ email: "", role: "volunteer" });
       await load();
     } catch (err) {
       setError(err.message);
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleRevoke(invitationId) {
+    if (!confirm("Revoke this invitation?")) return;
+    setRowError("");
+    try {
+      await api.revokeInvitation(currentId, invitationId);
+      await load();
+    } catch (err) {
+      setRowError(err.message);
     }
   }
 
@@ -82,7 +112,7 @@ export default function Team() {
           <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ marginTop: 0 }}>Invite a Collaborator</h3>
             <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
-              The person must already have a Chikerito account. Assign them a role: Finance Manager, Event Planner, Volunteer, or Editor.
+              They don't need an account yet — invite by email and assign a role: Finance Manager, Event Planner, Volunteer, or Editor. The invitation waits until they accept.
             </p>
             {error && <div className="error-banner">{error}</div>}
             <form onSubmit={handleInvite} style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -103,9 +133,42 @@ export default function Team() {
           </div>
         )}
 
+        {loadError && <div className="error-banner" style={{ marginBottom: 20 }}>{loadError}</div>}
+        {rowError && <div className="error-banner" style={{ marginBottom: 20 }}>{rowError}</div>}
+
+        {(canManage || invitations.length > 0) && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <h3 style={{ marginTop: 0 }}>Pending Invitations</h3>
+            {loading ? (
+              <p>Loading...</p>
+            ) : invitations.length === 0 ? (
+              <p style={{ color: "var(--text-muted)" }}>No pending invitations.</p>
+            ) : (
+              <table className="table">
+                <thead><tr><th>Email</th><th>Role</th><th>Status</th>{canManage && <th></th>}</tr></thead>
+                <tbody>
+                  {invitations.map((inv) => (
+                    <tr key={inv.id}>
+                      <td>{inv.email}</td>
+                      <td><span className="badge badge-neutral">{inv.role.replace("_", " ")}</span></td>
+                      <td style={{ color: "var(--text-muted)", fontSize: 13 }}>{formatExpiry(inv.expires_at)}</td>
+                      {canManage && (
+                        <td>
+                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => handleRevoke(inv.id)}>
+                            Revoke
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Team Members</h3>
-          {rowError && <div className="error-banner">{rowError}</div>}
           {loading ? (
             <p>Loading...</p>
           ) : team.length === 0 ? (

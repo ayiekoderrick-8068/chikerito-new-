@@ -67,11 +67,18 @@ export const api = {
     request(withPasscode(`/public/lifespaces/${slug}/contribute`, passcode), { method: "POST", body: payload, auth: false }),
 
   listTeam: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/team`),
-  inviteTeam: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/team`, { method: "POST", body: payload }),
   updateTeamMemberRole: (lifeSpaceId, memberId, role) =>
     request(`/lifespaces/${lifeSpaceId}/team/${memberId}`, { method: "PATCH", body: { role } }),
   removeTeamMember: (lifeSpaceId, memberId) =>
     request(`/lifespaces/${lifeSpaceId}/team/${memberId}`, { method: "DELETE" }),
+
+  listInvitations: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/invitations`),
+  createInvitation: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/invitations`, { method: "POST", body: payload }),
+  revokeInvitation: (lifeSpaceId, invitationId) =>
+    request(`/lifespaces/${lifeSpaceId}/invitations/${invitationId}`, { method: "DELETE" }),
+  listPendingInvitationsForMe: () => request("/invitations/pending"),
+  acceptInvitation: (invitationId) => request(`/invitations/${invitationId}/accept`, { method: "POST" }),
+  declineInvitation: (invitationId) => request(`/invitations/${invitationId}/decline`, { method: "POST" }),
 
   listTasks: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/tasks`),
   createTask: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/tasks`, { method: "POST", body: payload }),

@@ -144,7 +144,7 @@ export default function Dashboard() {
             ) : (
               notifications.map((n) => (
                 <div className="notif-item" key={n.id}>
-                  <span>{n.type === "milestone_funded" ? "🏆" : n.type === "budget_warning" ? "⚠️" : n.type === "donation" ? "💛" : "🧾"}</span>
+                  <span>{n.type === "milestone_funded" ? "🏆" : n.type === "budget_warning" ? "⚠️" : n.type === "donation" ? "💛" : n.type === "team_joined" ? "🤝" : "🧾"}</span>
                   <span>{n.message}</span>
                 </div>
               ))

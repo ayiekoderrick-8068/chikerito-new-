@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
@@ -12,6 +12,54 @@ export default function LifeSpaces() {
   const [form, setForm] = useState({ title: "", milestoneType: "wedding", goalAmount: 0, story: "", coverImage: "" });
   const [saving, setSaving] = useState(false);
   const [imageError, setImageError] = useState("");
+
+  const [invitations, setInvitations] = useState([]);
+  const [invitationsLoading, setInvitationsLoading] = useState(true);
+  const [invitationsError, setInvitationsError] = useState("");
+  const [respondingId, setRespondingId] = useState(null);
+
+  async function loadInvitations() {
+    setInvitationsLoading(true);
+    setInvitationsError("");
+    try {
+      const { invitations } = await api.listPendingInvitationsForMe();
+      setInvitations(invitations);
+    } catch (err) {
+      setInvitationsError(err.message);
+    } finally {
+      setInvitationsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadInvitations();
+  }, []);
+
+  async function handleAccept(invitation) {
+    setRespondingId(invitation.id);
+    try {
+      await api.acceptInvitation(invitation.id);
+      await refresh();
+      selectLifeSpace(invitation.life_space_id);
+      await loadInvitations();
+    } catch (err) {
+      setInvitationsError(err.message);
+    } finally {
+      setRespondingId(null);
+    }
+  }
+
+  async function handleDecline(invitation) {
+    setRespondingId(invitation.id);
+    try {
+      await api.declineInvitation(invitation.id);
+      await loadInvitations();
+    } catch (err) {
+      setInvitationsError(err.message);
+    } finally {
+      setRespondingId(null);
+    }
+  }
 
   async function handleCoverChange(e) {
     const file = e.target.files[0];
@@ -43,6 +91,39 @@ export default function LifeSpaces() {
     <>
       <Topbar title="My Life Spaces" />
       <div className="page-body">
+        {invitationsError && <div className="error-banner" style={{ marginBottom: 20 }}>{invitationsError}</div>}
+
+        {!invitationsLoading && invitations.length > 0 && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <h3 style={{ marginTop: 0 }}>Pending Invitations</h3>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+              {invitations.map((inv) => (
+                <li key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <span>
+                    You're invited to <strong>{inv.lifeSpaceTitle}</strong> as {inv.role.replace("_", " ")}
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={respondingId === inv.id}
+                      onClick={() => handleAccept(inv)}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      disabled={respondingId === inv.id}
+                      onClick={() => handleDecline(inv)}
+                    >
+                      Decline
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Create Life Space</button>
         </div>

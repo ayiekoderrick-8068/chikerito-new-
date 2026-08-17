@@ -3,6 +3,7 @@ import { api } from "../api";
 
 const TYPE_ICON = {
   milestone_funded: "🏆",
+  team_joined: "🤝",
   budget_warning: "⚠️",
   donation: "💛",
   expense_added: "🧾",
