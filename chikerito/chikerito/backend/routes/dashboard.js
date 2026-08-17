@@ -1,12 +1,13 @@
 const express = require("express");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
+const { requireMember } = require("../middleware/authorize");
+const { sanitizeLifeSpace } = require("../serialize");
 
 const router = express.Router();
 
-router.get("/lifespaces/:id/dashboard", requireAuth, (req, res) => {
-  const lifeSpace = db.table("life_spaces").find(req.params.id);
-  if (!lifeSpace) return res.status(404).json({ error: "Life space not found" });
+router.get("/lifespaces/:id/dashboard", requireAuth, requireMember("id"), (req, res) => {
+  const lifeSpace = req.lifeSpace;
 
   const contributions = db.table("contributions").where((c) => c.life_space_id === lifeSpace.id);
   const expenses = db.table("expenses").where((e) => e.life_space_id === lifeSpace.id);
@@ -60,7 +61,7 @@ router.get("/lifespaces/:id/dashboard", requireAuth, (req, res) => {
     .slice(0, 10);
 
   res.json({
-    lifeSpace,
+    lifeSpace: sanitizeLifeSpace(lifeSpace, req.role),
     stats: { goal: lifeSpace.goal_amount, raised, spent, available, remainingGoal, progress },
     categoryBreakdown,
     monthlyTrend,

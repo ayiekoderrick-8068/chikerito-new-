@@ -2,16 +2,17 @@ const express = require("express");
 const { v4: uuid } = require("uuid");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
+const { requireMember, requireCapability, requireResourceCapability } = require("../middleware/authorize");
 const { pushNotification } = require("../notify");
 
 const router = express.Router();
 
-router.get("/lifespaces/:lifeSpaceId/expenses", requireAuth, (req, res) => {
+router.get("/lifespaces/:lifeSpaceId/expenses", requireAuth, requireMember("lifeSpaceId"), (req, res) => {
   const expenses = db.table("expenses").where((e) => e.life_space_id === req.params.lifeSpaceId);
   res.json({ expenses: expenses.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) });
 });
 
-router.post("/lifespaces/:lifeSpaceId/expenses", requireAuth, (req, res) => {
+router.post("/lifespaces/:lifeSpaceId/expenses", requireAuth, requireCapability("expense:manage", "lifeSpaceId"), (req, res) => {
   const { categoryId, vendor, amount, plannedAmount, invoiceUrl, receiptUrl, paymentDate, status, notes } = req.body;
   if (!vendor || (!amount && !plannedAmount)) return res.status(400).json({ error: "vendor and amount (or plannedAmount) are required" });
   const expense = db.table("expenses").insert({
@@ -42,7 +43,7 @@ router.post("/lifespaces/:lifeSpaceId/expenses", requireAuth, (req, res) => {
   res.status(201).json({ expense });
 });
 
-router.patch("/expenses/:id", requireAuth, (req, res) => {
+router.patch("/expenses/:id", requireAuth, requireResourceCapability("expenses", "expense:manage"), (req, res) => {
   const allowed = ["vendor", "amount", "plannedAmount", "invoiceUrl", "receiptUrl", "paymentDate", "status", "notes", "categoryId"];
   const columnMap = { invoiceUrl: "invoice_url", receiptUrl: "receipt_url", paymentDate: "payment_date", categoryId: "category_id", plannedAmount: "planned_amount" };
   const patch = {};
@@ -52,11 +53,10 @@ router.patch("/expenses/:id", requireAuth, (req, res) => {
     }
   }
   const updated = db.table("expenses").update(req.params.id, patch);
-  if (!updated) return res.status(404).json({ error: "Expense not found" });
   res.json({ expense: updated });
 });
 
-router.delete("/expenses/:id", requireAuth, (req, res) => {
+router.delete("/expenses/:id", requireAuth, requireResourceCapability("expenses", "expense:manage"), (req, res) => {
   db.table("expenses").remove(req.params.id);
   res.status(204).end();
 });

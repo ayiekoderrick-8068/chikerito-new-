@@ -2,12 +2,13 @@ const express = require("express");
 const { v4: uuid } = require("uuid");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
+const { requireMember } = require("../middleware/authorize");
 const { pushNotification } = require("../notify");
 const { findPublicLifeSpace, checkPublicAccess } = require("../publicAccess");
 
 const router = express.Router();
 
-router.get("/lifespaces/:lifeSpaceId/contributions", requireAuth, (req, res) => {
+router.get("/lifespaces/:lifeSpaceId/contributions", requireAuth, requireMember("lifeSpaceId"), (req, res) => {
   const contributions = db.table("contributions").where((c) => c.life_space_id === req.params.lifeSpaceId);
   res.json({ contributions: contributions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) });
 });

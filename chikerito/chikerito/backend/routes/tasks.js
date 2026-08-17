@@ -2,15 +2,16 @@ const express = require("express");
 const { v4: uuid } = require("uuid");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
+const { requireMember, requireCapability, requireResourceCapability } = require("../middleware/authorize");
 
 const router = express.Router();
 
-router.get("/lifespaces/:lifeSpaceId/tasks", requireAuth, (req, res) => {
+router.get("/lifespaces/:lifeSpaceId/tasks", requireAuth, requireMember("lifeSpaceId"), (req, res) => {
   const tasks = db.table("tasks").where((t) => t.life_space_id === req.params.lifeSpaceId);
   res.json({ tasks: tasks.sort((a, b) => (a.due_date || "9999").localeCompare(b.due_date || "9999")) });
 });
 
-router.post("/lifespaces/:lifeSpaceId/tasks", requireAuth, (req, res) => {
+router.post("/lifespaces/:lifeSpaceId/tasks", requireAuth, requireCapability("task:manage", "lifeSpaceId"), (req, res) => {
   const { title, category, dueDate, notes } = req.body;
   if (!title) return res.status(400).json({ error: "title is required" });
   const task = db.table("tasks").insert({
@@ -26,7 +27,7 @@ router.post("/lifespaces/:lifeSpaceId/tasks", requireAuth, (req, res) => {
   res.status(201).json({ task });
 });
 
-router.patch("/tasks/:id", requireAuth, (req, res) => {
+router.patch("/tasks/:id", requireAuth, requireResourceCapability("tasks", "task:manage"), (req, res) => {
   const allowed = ["title", "category", "dueDate", "completed", "notes"];
   const columnMap = { dueDate: "due_date" };
   const patch = {};
@@ -34,11 +35,10 @@ router.patch("/tasks/:id", requireAuth, (req, res) => {
     if (req.body[key] !== undefined) patch[columnMap[key] || key] = req.body[key];
   }
   const updated = db.table("tasks").update(req.params.id, patch);
-  if (!updated) return res.status(404).json({ error: "Task not found" });
   res.json({ task: updated });
 });
 
-router.delete("/tasks/:id", requireAuth, (req, res) => {
+router.delete("/tasks/:id", requireAuth, requireResourceCapability("tasks", "task:manage"), (req, res) => {
   db.table("tasks").remove(req.params.id);
   res.status(204).end();
 });
