@@ -1,5 +1,7 @@
 const request = require("supertest");
+const { v4: uuid } = require("uuid");
 const { createApp } = require("../../app");
+const db = require("../../db");
 
 let seq = 0;
 function unique(prefix) {
@@ -124,6 +126,21 @@ async function createTask(token, lifeSpaceId, overrides = {}) {
   return res.body.task;
 }
 
+// Direct insert, not through the API — for precisely-timed/ordered
+// notification fixtures that the product's own notification-producing
+// actions (expense/contribution routes) don't give predictable control over.
+function createNotification(lifeSpaceId, overrides = {}) {
+  return db.table("notifications").insert({
+    id: uuid(),
+    life_space_id: lifeSpaceId,
+    type: "donation",
+    message: unique("Test notification "),
+    read: false,
+    created_at: new Date().toISOString(),
+    ...overrides,
+  });
+}
+
 async function contribute(slug, overrides = {}) {
   const payload = { contributorName: "Aunt Mary", amount: 100, ...overrides };
   const res = await api().post(`/api/public/lifespaces/${slug}/contribute`).send(payload);
@@ -175,6 +192,7 @@ module.exports = {
   createExpense,
   createTask,
   addTeamMember,
+  createNotification,
   contribute,
   createContribution,
   seedScenario,
