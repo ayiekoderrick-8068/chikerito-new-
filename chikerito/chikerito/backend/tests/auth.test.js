@@ -187,13 +187,27 @@ describe("GET /api/auth/me", () => {
     expect(res.status).toBe(401);
   });
 
-  it("404s when the token is valid but the user is gone", async () => {
+  // Changed by the session-tracking work: a hand-crafted token (signed with
+  // the real secret but never issued through register/login) now has no
+  // matching session row at all, so it 401s at the auth layer before ever
+  // reaching this handler's own lookup — a stronger guarantee than before,
+  // not a weaker one. The scenario this test actually cares about (a
+  // legitimately-issued, still-active session pointing at a user who no
+  // longer exists) is reproduced directly instead.
+  it("404s when the session is valid but the user has been deleted", async () => {
+    const { token, user } = await registerUser();
+    require("../db").table("users").remove(user.id);
+    const res = await api().get("/api/auth/me").set(auth(token));
+    expect(res.status).toBe(404);
+  });
+
+  it("401s a hand-crafted token that was never issued through register/login", async () => {
     const orphan = jwt.sign(
-      { id: "no-such-user", email: "gone@chikerito.test" },
+      { id: "no-such-user", email: "gone@chikerito.test", sid: "no-such-session" },
       process.env.JWT_SECRET
     );
     const res = await api().get("/api/auth/me").set(auth(orphan));
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
   });
 });
 
