@@ -45,34 +45,39 @@ function renderPage() {
 describe("Settings — role-based guards", () => {
   beforeEach(() => {
     useAuth.mockReturnValue({ user: { firstName: "Ada", lastName: "L", email: "ada@chikerito.test" } });
+    api.listSessions.mockResolvedValue({ sessions: [] });
   });
 
-  it("owner sees the full form, including visibility/passcode", () => {
+  it("owner sees the full form, including visibility/passcode", async () => {
     mockLifeSpace("owner");
     renderPage();
     expect(screen.getByText("Event Visibility")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save changes/i })).toBeInTheDocument();
+    await screen.findByText("Security");
   });
 
-  it("finance_manager (edit_settings but not edit_visibility) sees the form without the visibility section", () => {
+  it("finance_manager (edit_settings but not edit_visibility) sees the form without the visibility section", async () => {
     mockLifeSpace("finance_manager");
     renderPage();
     expect(screen.queryByText("Event Visibility")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save changes/i })).toBeInTheDocument();
+    await screen.findByText("Security");
   });
 
-  it("editor (edit_settings but not edit_visibility) also sees the form without the visibility section", () => {
+  it("editor (edit_settings but not edit_visibility) also sees the form without the visibility section", async () => {
     mockLifeSpace("editor");
     renderPage();
     expect(screen.queryByText("Event Visibility")).not.toBeInTheDocument();
+    await screen.findByText("Security");
   });
 
-  it("volunteer (no edit_settings at all) sees a read-only summary, no form", () => {
+  it("volunteer (no edit_settings at all) sees a read-only summary, no form", async () => {
     mockLifeSpace("volunteer");
     renderPage();
     expect(screen.queryByRole("button", { name: /save changes/i })).not.toBeInTheDocument();
     expect(screen.getByText(/doesn't include editing/i)).toBeInTheDocument();
     expect(screen.getByText("Ada's Wedding")).toBeInTheDocument();
+    await screen.findByText("Security");
   });
 
   it("a finance_manager saving basic settings does not send visibility fields in the request", async () => {
@@ -100,5 +105,13 @@ describe("Settings — role-based guards", () => {
     await waitFor(() => expect(api.updateLifeSpace).toHaveBeenCalled());
     const [, payload] = api.updateLifeSpace.mock.calls[0];
     expect(payload).toHaveProperty("visibility");
+  });
+
+  it("still shows Account and Security even with no life space at all", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: null, current: null, refresh: vi.fn() });
+    renderPage();
+    expect(screen.getByText(/create a life space to manage its settings/i)).toBeInTheDocument();
+    expect(screen.getByText("Account")).toBeInTheDocument();
+    expect(await screen.findByText("Security")).toBeInTheDocument();
   });
 });
