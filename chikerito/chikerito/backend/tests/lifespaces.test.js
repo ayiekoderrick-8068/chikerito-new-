@@ -3,6 +3,7 @@ const {
   api,
   registerUser,
   createLifeSpace,
+  addTeamMember,
 } = require("./helpers/factories");
 
 // These cover the owner's own access paths only. Cross-tenant access is
@@ -188,14 +189,11 @@ describe("GET /api/lifespaces", () => {
     expect(res.body.lifeSpaces).toEqual([]);
   });
 
-  it("includes life spaces the caller was added to as a team member", async () => {
+  it("includes life spaces the caller joined by accepting an invitation", async () => {
     const owner = await registerUser();
     const helper = await registerUser();
     const space = await createLifeSpace(owner.token, { title: "Shared" });
-    await api()
-      .post(`/api/lifespaces/${space.id}/team`)
-      .set(owner.headers)
-      .send({ email: helper.user.email, role: "finance_manager" });
+    await addTeamMember(owner.token, space.id, helper, "finance_manager");
     const res = await api().get("/api/lifespaces").set(helper.headers);
     expect(res.body.lifeSpaces.map((s) => s.id)).toContain(space.id);
   });
@@ -402,53 +400,27 @@ describe("team membership", () => {
   beforeEach(() => freshDatabase());
   afterAll(() => cleanupDatabases());
 
-  it("adds an existing user to the team with the given role", async () => {
+  // Changed by the invitations phase: adding a member is no longer a single
+  // immediate POST /:id/team grant — it now goes through a real pending
+  // invitation that the invitee accepts or declines themselves (see
+  // invitations.test.js for the full lifecycle: creation, duplicate/already-
+  // member prevention, accept/decline, expiry, revocation, cross-tenant
+  // isolation). This "no account required" case is a deliberate behavior
+  // change, not an adaptation of the old test: the old endpoint 404'd
+  // inviting an unregistered email because it granted membership
+  // immediately and had no one to grant it to; a pending invitation has
+  // nowhere near that requirement — it just waits for that email to sign
+  // up and accept.
+  it("an accepted invitation adds the invitee to the team with the invited role", async () => {
     const owner = await registerUser();
     const helper = await registerUser({ firstName: "Ada", lastName: "Lovelace" });
     const space = await createLifeSpace(owner.token);
-    const res = await api()
-      .post(`/api/lifespaces/${space.id}/team`)
-      .set(owner.headers)
-      .send({ email: helper.user.email, role: "event_planner" });
-    expect(res.status).toBe(201);
-    expect(res.body.member).toMatchObject({
+    const member = await addTeamMember(owner.token, space.id, helper, "event_planner");
+    expect(member).toMatchObject({
       life_space_id: space.id,
       user_id: helper.user.id,
       role: "event_planner",
     });
-  });
-
-  it("defaults an invited member to the volunteer role", async () => {
-    const owner = await registerUser();
-    const helper = await registerUser();
-    const space = await createLifeSpace(owner.token);
-    const res = await api()
-      .post(`/api/lifespaces/${space.id}/team`)
-      .set(owner.headers)
-      .send({ email: helper.user.email });
-    expect(res.body.member.role).toBe("volunteer");
-  });
-
-  it("matches the invited email case-insensitively", async () => {
-    const owner = await registerUser({ email: "o@chikerito.test" });
-    await registerUser({ email: "Helper@chikerito.test" });
-    const space = await createLifeSpace(owner.token);
-    const res = await api()
-      .post(`/api/lifespaces/${space.id}/team`)
-      .set(owner.headers)
-      .send({ email: "HELPER@chikerito.test" });
-    expect(res.status).toBe(201);
-  });
-
-  it("404s when inviting an email with no account", async () => {
-    const owner = await registerUser();
-    const space = await createLifeSpace(owner.token);
-    const res = await api()
-      .post(`/api/lifespaces/${space.id}/team`)
-      .set(owner.headers)
-      .send({ email: "nobody@chikerito.test" });
-    expect(res.status).toBe(404);
-    expect(res.body.error).toMatch(/no user/i);
   });
 
   it("lists team members with their names and emails resolved", async () => {

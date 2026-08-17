@@ -103,15 +103,26 @@ async function createExpense(token, lifeSpaceId, overrides = {}) {
   return res.body.expense;
 }
 
-async function addTeamMember(ownerToken, lifeSpaceId, email, role) {
-  const res = await api()
-    .post(`/api/lifespaces/${lifeSpaceId}/team`)
+// Drives the real invite -> accept lifecycle rather than granting membership
+// directly, since that's how it actually works now. `invitee` is a full
+// registered-user object (as returned by registerUser()) — accepting needs
+// their own token, not just their email.
+async function addTeamMember(ownerToken, lifeSpaceId, invitee, role) {
+  const inviteRes = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/invitations`)
     .set(auth(ownerToken))
-    .send({ email, role });
-  if (res.status !== 201) {
-    throw new Error(`addTeamMember failed (${res.status}): ${JSON.stringify(res.body)}`);
+    .send({ email: invitee.user.email, role });
+  if (inviteRes.status !== 201) {
+    throw new Error(`addTeamMember invite failed (${inviteRes.status}): ${JSON.stringify(inviteRes.body)}`);
   }
-  return res.body.member;
+  const acceptRes = await api()
+    .post(`/api/invitations/${inviteRes.body.invitation.id}/accept`)
+    .set(auth(invitee.token));
+  if (acceptRes.status !== 200) {
+    throw new Error(`addTeamMember accept failed (${acceptRes.status}): ${JSON.stringify(acceptRes.body)}`);
+  }
+  const team = await api().get(`/api/lifespaces/${lifeSpaceId}/team`).set(auth(ownerToken));
+  return team.body.team.find((m) => m.user_id === invitee.user.id);
 }
 
 async function createTask(token, lifeSpaceId, overrides = {}) {

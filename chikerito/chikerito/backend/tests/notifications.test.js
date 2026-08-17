@@ -112,11 +112,15 @@ describe("GET /api/lifespaces/:id/notifications", () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token);
     const helper = await registerUser();
-    await addTeamMember(owner.token, space.id, helper.user.email, "volunteer");
-    createNotification(space.id);
+    // addTeamMember() itself raises a team_joined notification (the invitations
+    // phase integrating with this feature), on top of the one seeded below.
+    await addTeamMember(owner.token, space.id, helper, "volunteer");
+    createNotification(space.id, { message: "Seeded for this test" });
     const res = await api().get(`/api/lifespaces/${space.id}/notifications`).set(helper.headers);
     expect(res.status).toBe(200);
-    expect(res.body.notifications).toHaveLength(1);
+    expect(res.body.notifications).toHaveLength(2);
+    expect(res.body.notifications.some((n) => n.message === "Seeded for this test")).toBe(true);
+    expect(res.body.notifications.some((n) => n.type === "team_joined")).toBe(true);
   });
 });
 
@@ -289,7 +293,7 @@ describe("PATCH /api/notifications/:id", () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token);
     const helper = await registerUser();
-    await addTeamMember(owner.token, space.id, helper.user.email, "volunteer");
+    await addTeamMember(owner.token, space.id, helper, "volunteer");
     const n = createNotification(space.id, { read: false });
     const res = await api().patch(`/api/notifications/${n.id}`).set(helper.headers).send({ read: true });
     expect(res.status).toBe(200);
@@ -390,7 +394,7 @@ describe("cross-tenant isolation", () => {
     const ownerA = await registerUser();
     const spaceA = await createLifeSpace(ownerA.token, { title: "A" });
     const memberA = await registerUser();
-    await addTeamMember(ownerA.token, spaceA.id, memberA.user.email, "finance_manager");
+    await addTeamMember(ownerA.token, spaceA.id, memberA, "finance_manager");
 
     const ownerB = await registerUser();
     const spaceB = await createLifeSpace(ownerB.token, { title: "B" });

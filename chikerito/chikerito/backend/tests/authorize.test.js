@@ -16,7 +16,7 @@ async function setupWithRole(role) {
   const owner = await registerUser();
   const space = await createLifeSpace(owner.token);
   const helper = await registerUser();
-  if (role) await addTeamMember(owner.token, space.id, helper.user.email, role);
+  if (role) await addTeamMember(owner.token, space.id, helper, role);
   return { owner, space, helper };
 }
 
@@ -32,7 +32,7 @@ const tryEditVisibility = (user, spaceId) =>
   api().patch(`/api/lifespaces/${spaceId}`).set(user.headers).send({ visibility: "public" });
 const tryDeleteLifeSpace = (user, spaceId) => api().delete(`/api/lifespaces/${spaceId}`).set(user.headers);
 const tryInvite = (user, spaceId, email = "nobody@chikerito.test") =>
-  api().post(`/api/lifespaces/${spaceId}/team`).set(user.headers).send({ email, role: "volunteer" });
+  api().post(`/api/lifespaces/${spaceId}/invitations`).set(user.headers).send({ email, role: "volunteer" });
 
 // [role, { category, expense, task, settings, visibility, delete, team }]
 const MATRIX = [
@@ -184,7 +184,7 @@ describe("non-members", () => {
       api().post(`/api/lifespaces/${space.id}/tasks`).set(stranger.headers).send({ title: "X" }),
       api().patch(`/api/tasks/${task.id}`).set(stranger.headers).send({ title: "Hijacked" }),
       api().delete(`/api/tasks/${task.id}`).set(stranger.headers),
-      api().post(`/api/lifespaces/${space.id}/team`).set(stranger.headers).send({ email: owner.user.email }),
+      api().post(`/api/lifespaces/${space.id}/invitations`).set(stranger.headers).send({ email: "nobody@chikerito.test", role: "volunteer" }),
     ]);
     writes.forEach((res) => expect(res.status).toBe(403));
 
@@ -214,7 +214,7 @@ describe("cross-tenant access", () => {
     const spaceB = await createLifeSpace(ownerB.token, { title: "B" });
 
     const helper = await registerUser();
-    await addTeamMember(ownerA.token, spaceA.id, helper.user.email, "finance_manager");
+    await addTeamMember(ownerA.token, spaceA.id, helper, "finance_manager");
 
     // Full manage rights on A...
     expect((await tryCreateCategory(helper, spaceA.id)).status).toBe(201);
@@ -241,7 +241,7 @@ describe("cross-tenant access", () => {
     const ownerB = await registerUser();
     const spaceB = await createLifeSpace(ownerB.token, { title: "B" });
     const financeManagerB = await registerUser();
-    await addTeamMember(ownerB.token, spaceB.id, financeManagerB.user.email, "finance_manager");
+    await addTeamMember(ownerB.token, spaceB.id, financeManagerB, "finance_manager");
 
     // financeManagerB can manage expenses in B, but expenseInA belongs to A.
     const res = await api()
@@ -261,7 +261,7 @@ describe("privilege escalation", () => {
     const space = await createLifeSpace(owner.token);
     const helper = await registerUser();
     const res = await api()
-      .post(`/api/lifespaces/${space.id}/team`)
+      .post(`/api/lifespaces/${space.id}/invitations`)
       .set(owner.headers)
       .send({ email: helper.user.email, role: "owner" });
     expect(res.status).toBe(400);
@@ -272,7 +272,7 @@ describe("privilege escalation", () => {
     const space = await createLifeSpace(owner.token);
     const helper = await registerUser();
     const res = await api()
-      .post(`/api/lifespaces/${space.id}/team`)
+      .post(`/api/lifespaces/${space.id}/invitations`)
       .set(owner.headers)
       .send({ email: helper.user.email, role: "super-admin" });
     expect(res.status).toBe(400);
@@ -281,7 +281,8 @@ describe("privilege escalation", () => {
   it("rejects changing a team member's role to owner", async () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token);
-    const member = await addTeamMember(owner.token, space.id, (await registerUser()).user.email, "volunteer");
+    const invitee = await registerUser();
+    const member = await addTeamMember(owner.token, space.id, invitee, "volunteer");
     const res = await api()
       .patch(`/api/lifespaces/${space.id}/team/${member.id}`)
       .set(owner.headers)
@@ -293,13 +294,14 @@ describe("privilege escalation", () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token);
     const financeManager = await registerUser();
-    await addTeamMember(owner.token, space.id, financeManager.user.email, "finance_manager");
-    const victim = await addTeamMember(owner.token, space.id, (await registerUser()).user.email, "volunteer");
+    await addTeamMember(owner.token, space.id, financeManager, "finance_manager");
+    const victimUser = await registerUser();
+    const victim = await addTeamMember(owner.token, space.id, victimUser, "volunteer");
 
     const inviteRes = await api()
-      .post(`/api/lifespaces/${space.id}/team`)
+      .post(`/api/lifespaces/${space.id}/invitations`)
       .set(financeManager.headers)
-      .send({ email: "nobody@chikerito.test" });
+      .send({ email: "nobody@chikerito.test", role: "volunteer" });
     expect(inviteRes.status).toBe(403);
 
     const roleChangeRes = await api()
@@ -320,7 +322,7 @@ describe("privilege escalation", () => {
     const attacker = await registerUser();
     // Not a member at all — cannot even reach the invite endpoint to add themselves.
     const res = await api()
-      .post(`/api/lifespaces/${space.id}/team`)
+      .post(`/api/lifespaces/${space.id}/invitations`)
       .set(attacker.headers)
       .send({ email: attacker.user.email, role: "finance_manager" });
     expect(res.status).toBe(403);
@@ -351,7 +353,7 @@ describe("protected destructive operations", () => {
   it("only the owner can change a team member's role", async () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token);
-    const member = await addTeamMember(owner.token, space.id, (await registerUser()).user.email, "volunteer");
+    const member = await addTeamMember(owner.token, space.id, await registerUser(), "volunteer");
     const res = await api()
       .patch(`/api/lifespaces/${space.id}/team/${member.id}`)
       .set(owner.headers)
@@ -363,7 +365,7 @@ describe("protected destructive operations", () => {
   it("only the owner can remove a team member", async () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token);
-    const member = await addTeamMember(owner.token, space.id, (await registerUser()).user.email, "volunteer");
+    const member = await addTeamMember(owner.token, space.id, await registerUser(), "volunteer");
     const res = await api().delete(`/api/lifespaces/${space.id}/team/${member.id}`).set(owner.headers);
     expect(res.status).toBe(204);
     const team = await api().get(`/api/lifespaces/${space.id}/team`).set(owner.headers);
@@ -391,7 +393,7 @@ describe("protected destructive operations", () => {
   it("404s a role change or removal for a team member id that doesn't belong to the given life space", async () => {
     const ownerA = await registerUser();
     const spaceA = await createLifeSpace(ownerA.token);
-    const memberA = await addTeamMember(ownerA.token, spaceA.id, (await registerUser()).user.email, "volunteer");
+    const memberA = await addTeamMember(ownerA.token, spaceA.id, await registerUser(), "volunteer");
 
     const ownerB = await registerUser();
     const spaceB = await createLifeSpace(ownerB.token);
