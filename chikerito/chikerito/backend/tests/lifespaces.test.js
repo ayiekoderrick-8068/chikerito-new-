@@ -461,13 +461,18 @@ describe("team membership", () => {
     expect(res.body.team[0].email).toBe(owner.user.email);
   });
 
-  it("returns an empty team for an unknown life space", async () => {
+  // Changed by RBAC work: this used to silently 200 with an empty array for
+  // any unknown id, because the handler never checked whether the life space
+  // existed at all before filtering team_members by it. Team routes now
+  // resolve the life space through the same requireMember() gate as every
+  // other route, so an unknown id 404s consistently instead — this wasn't
+  // insecure behavior, just a pre-RBAC inconsistency with the rest of the API.
+  it("404s for an unknown life space instead of returning an empty team", async () => {
     const owner = await registerUser();
     const res = await api()
       .get("/api/lifespaces/no-such-id/team")
       .set(owner.headers);
-    expect(res.status).toBe(200);
-    expect(res.body.team).toEqual([]);
+    expect(res.status).toBe(404);
   });
 
   it("401s without a token", async () => {

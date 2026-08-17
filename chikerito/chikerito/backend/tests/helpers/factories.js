@@ -101,6 +101,17 @@ async function createExpense(token, lifeSpaceId, overrides = {}) {
   return res.body.expense;
 }
 
+async function addTeamMember(ownerToken, lifeSpaceId, email, role) {
+  const res = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/team`)
+    .set(auth(ownerToken))
+    .send({ email, role });
+  if (res.status !== 201) {
+    throw new Error(`addTeamMember failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return res.body.member;
+}
+
 async function createTask(token, lifeSpaceId, overrides = {}) {
   const payload = { title: unique("Task "), ...overrides };
   const res = await api()
@@ -163,6 +174,7 @@ module.exports = {
   createCategory,
   createExpense,
   createTask,
+  addTeamMember,
   contribute,
   createContribution,
   seedScenario,
