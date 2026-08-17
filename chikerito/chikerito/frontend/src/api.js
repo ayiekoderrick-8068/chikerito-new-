@@ -44,6 +44,12 @@ export const api = {
   register: (payload) => request("/auth/register", { method: "POST", body: payload, auth: false }),
   login: (payload) => request("/auth/login", { method: "POST", body: payload, auth: false }),
   me: () => request("/auth/me"),
+  forgotPassword: (email) => request("/auth/forgot-password", { method: "POST", body: { email }, auth: false }),
+  resetPassword: (token, password) => request("/auth/reset-password", { method: "POST", body: { token, password }, auth: false }),
+
+  listSessions: () => request("/auth/sessions"),
+  revokeSession: (id) => request(`/auth/sessions/${id}`, { method: "DELETE" }),
+  revokeOtherSessions: () => request("/auth/sessions/revoke-others", { method: "POST" }),
 
   listLifeSpaces: () => request("/lifespaces"),
   createLifeSpace: (payload) => request("/lifespaces", { method: "POST", body: payload }),
