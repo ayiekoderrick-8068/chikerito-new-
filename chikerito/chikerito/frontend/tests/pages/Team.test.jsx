@@ -31,9 +31,14 @@ function renderPage() {
   );
 }
 
+const invitations = [
+  { id: "i1", email: "pending@chikerito.test", role: "editor", status: "pending", expires_at: new Date(Date.now() + 3 * 86400000).toISOString() },
+];
+
 describe("Team — role-based guards", () => {
   beforeEach(() => {
     api.listTeam.mockResolvedValue({ team });
+    api.listInvitations.mockResolvedValue({ invitations: [] });
   });
 
   it("owner sees the invite form and manage controls, but never for the owner's own row", async () => {
@@ -84,5 +89,60 @@ describe("Team — role-based guards", () => {
 
     expect(window.confirm).toHaveBeenCalled();
     await waitFor(() => expect(api.removeTeamMember).toHaveBeenCalledWith("ls1", "m1"));
+  });
+
+  it("submitting the invite form calls createInvitation", async () => {
+    mockLifeSpace("owner");
+    api.createInvitation.mockResolvedValue({ invitation: { id: "i2" } });
+    renderPage();
+    await screen.findByText("Helper Person");
+
+    await userEvent.type(document.querySelector('input[type="email"]'), "new@chikerito.test");
+    await userEvent.click(screen.getByRole("button", { name: /^invite$/i }));
+
+    await waitFor(() =>
+      expect(api.createInvitation).toHaveBeenCalledWith("ls1", { email: "new@chikerito.test", role: "volunteer" })
+    );
+  });
+});
+
+describe("Team — pending invitations", () => {
+  beforeEach(() => {
+    api.listTeam.mockResolvedValue({ team });
+  });
+
+  it("shows an empty state when there are none", async () => {
+    mockLifeSpace("owner");
+    api.listInvitations.mockResolvedValue({ invitations: [] });
+    renderPage();
+    expect(await screen.findByText(/no pending invitations/i)).toBeInTheDocument();
+  });
+
+  it("lists pending invitations with email, role, and expiry, and lets the owner revoke", async () => {
+    mockLifeSpace("owner");
+    api.listInvitations.mockResolvedValue({ invitations });
+    api.revokeInvitation.mockResolvedValue({});
+    renderPage();
+    await screen.findByText("pending@chikerito.test");
+    expect(screen.getByText(/expires in 3 days/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /revoke/i }));
+
+    await waitFor(() => expect(api.revokeInvitation).toHaveBeenCalledWith("ls1", "i1"));
+  });
+
+  it("a non-owner can see pending invitations but not revoke them", async () => {
+    mockLifeSpace("finance_manager");
+    api.listInvitations.mockResolvedValue({ invitations });
+    renderPage();
+    await screen.findByText("pending@chikerito.test");
+    expect(screen.queryByRole("button", { name: /revoke/i })).not.toBeInTheDocument();
+  });
+
+  it("shows an error banner if loading invitations fails", async () => {
+    mockLifeSpace("owner");
+    api.listInvitations.mockRejectedValue(new Error("Network error"));
+    renderPage();
+    expect(await screen.findByText("Network error")).toBeInTheDocument();
   });
 });
