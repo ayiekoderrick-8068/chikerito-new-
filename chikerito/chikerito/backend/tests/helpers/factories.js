@@ -101,6 +101,18 @@ async function createExpense(token, lifeSpaceId, overrides = {}) {
   return res.body.expense;
 }
 
+async function createTask(token, lifeSpaceId, overrides = {}) {
+  const payload = { title: unique("Task "), ...overrides };
+  const res = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/tasks`)
+    .set(auth(token))
+    .send(payload);
+  if (res.status !== 201) {
+    throw new Error(`createTask failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return res.body.task;
+}
+
 async function contribute(slug, overrides = {}) {
   const payload = { contributorName: "Aunt Mary", amount: 100, ...overrides };
   const res = await api().post(`/api/public/lifespaces/${slug}/contribute`).send(payload);
@@ -150,6 +162,7 @@ module.exports = {
   createLifeSpace,
   createCategory,
   createExpense,
+  createTask,
   contribute,
   createContribution,
   seedScenario,
