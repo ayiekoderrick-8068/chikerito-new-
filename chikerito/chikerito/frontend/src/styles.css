@@ -329,6 +329,25 @@ button { font-family: inherit; cursor: pointer; }
 .task-checkbox-label { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; }
 .task-checkbox-label input { width: auto; }
 .task-row.completed .task-title { color: var(--text-muted); text-decoration: line-through; }
+.task-row.blocked { border-left: 3px solid var(--warning, #d97706); background: rgba(217, 119, 6, .06); }
+.task-row.task-depth-1 { margin-left: 24px; }
+.task-row.task-depth-2 { margin-left: 48px; }
+.task-row.task-depth-3 { margin-left: 72px; }
+.task-title-wrap { display: inline-flex; flex-direction: column; gap: 2px; }
+.task-title-wrap small { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+.blocked-badge { border-radius: 999px; padding: 3px 8px; color: #92400e; background: #fef3c7; font-size: 11px; font-weight: 700; }
+.dependency-summary { color: var(--text-muted); font-size: 12px; max-width: 220px; }
+.subtask-progress { color: var(--primary); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.task-actions { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.task-relationship-fields { display: grid; gap: 14px; margin-top: 8px; }
+.dependency-picker { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; max-height: 170px; overflow: auto; }
+.dependency-picker legend { color: var(--text-muted); font-size: 12px; font-weight: 700; padding: 0 4px; }
+.dependency-picker label { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+.dependency-picker input { width: auto; }
+.planning-stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.graph-summary { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 12px 16px; color: var(--text-muted); font-size: 13px; }
+.graph-summary strong { color: var(--text); }
+@media (max-width: 900px) { .planning-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .category-badge { background: #eef0f4; color: var(--text-muted); font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
 .relative-date { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; min-width: 100px; text-align: right; }
 .relative-date.overdue { color: var(--danger); font-weight: 600; }

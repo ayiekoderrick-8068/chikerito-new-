@@ -109,6 +109,9 @@ export const api = {
   createTask: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/tasks`, { method: "POST", body: payload }),
   updateTask: (id, payload) => request(`/tasks/${id}`, { method: "PATCH", body: payload }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: "DELETE" }),
+  addTaskDependency: (id, dependencyTaskId) => request(`/tasks/${id}/dependencies`, { method: "POST", body: { dependencyTaskId } }),
+  replaceTaskDependencies: (id, dependencyTaskIds) => request(`/tasks/${id}/dependencies`, { method: "PUT", body: { dependencyTaskIds } }),
+  removeTaskDependency: (id, dependencyTaskId) => request(`/tasks/${id}/dependencies/${dependencyTaskId}`, { method: "DELETE" }),
 
   listNotifications: (lifeSpaceId, { unreadOnly, before, limit } = {}) => {
     const params = new URLSearchParams();

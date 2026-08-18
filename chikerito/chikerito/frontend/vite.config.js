@@ -15,5 +15,8 @@ export default defineConfig({
     globals: true,
     css: false,
     restoreMocks: true,
+    // Serial jsdom execution keeps optimistic state and fake clocks isolated.
+    minWorkers: 1,
+    maxWorkers: 1,
   },
 });
