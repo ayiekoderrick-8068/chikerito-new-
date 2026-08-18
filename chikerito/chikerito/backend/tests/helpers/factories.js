@@ -143,7 +143,7 @@ async function addTeamMember(ownerToken, lifeSpaceId, invitee, role) {
 }
 
 async function createTask(token, lifeSpaceId, overrides = {}) {
-  const payload = { title: unique("Task "), ...overrides };
+  const payload = { title: unique("Task "), priority: "medium", ...overrides };
   const res = await api()
     .post(`/api/lifespaces/${lifeSpaceId}/tasks`)
     .set(auth(token))
