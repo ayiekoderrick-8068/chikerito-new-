@@ -466,3 +466,29 @@ button { font-family: inherit; cursor: pointer; }
 @media (max-width: 640px) {
   .notification-panel { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; }
 }
+.analytics-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 20px; }
+.analytics-heading h2 { margin: 0 0 6px; }
+.analytics-heading p { margin: 0; color: var(--text-muted); }
+.analytics-filters { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)) auto; gap: 14px; align-items: end; margin-bottom: 24px; }
+.analytics-filters .field { margin-bottom: 0; }
+.analytics-presets { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.analytics-range-label { display: inline-block; margin-top: 8px; color: var(--text-muted); font-size: 13px; }
+.analytics-filter-actions { display: flex; gap: 8px; padding-bottom: 1px; }
+.analytics-filter-error { grid-column: 1 / -1; margin: 0; }
+.analytics-loading { padding: 48px; text-align: center; color: var(--text-muted); }
+.analytics-change { margin-top: 7px; color: var(--text-muted); font-size: 12px; }
+.analytics-stat-grid, .analytics-charts, .analytics-tables { margin-bottom: 24px; }
+.analytics-charts h3, .analytics-tables h3 { margin-top: 0; }
+.analytics-insights, .analytics-status { margin-bottom: 24px; }
+.analytics-insights h3, .analytics-status h3 { margin-top: 0; }
+.analytics-insights ul { margin: 0; padding-left: 20px; }
+.analytics-insight { margin: 8px 0; }
+.analytics-insight-warning { color: #8a5a00; }
+.analytics-insight-danger { color: var(--danger); }
+.analytics-status-list { display: flex; flex-wrap: wrap; gap: 12px; }
+.analytics-status-list > div { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.analytics-period-summary { display: flex; flex-wrap: wrap; gap: 22px; margin-bottom: 24px; }
+.analytics-period-summary > div { display: flex; flex-direction: column; gap: 4px; min-width: 110px; }
+.analytics-period-summary span { color: var(--text-muted); font-size: 12px; }
+@media (max-width: 980px) { .analytics-filters { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 620px) { .analytics-heading { flex-direction: column; } .analytics-filters { grid-template-columns: 1fr; } }

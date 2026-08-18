@@ -56,6 +56,15 @@ export const api = {
   getLifeSpace: (id) => request(`/lifespaces/${id}`),
   updateLifeSpace: (id, payload) => request(`/lifespaces/${id}`, { method: "PATCH", body: payload }),
   getDashboard: (id) => request(`/lifespaces/${id}/dashboard`),
+  getAnalytics: (id, filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.categoryId) params.set("categoryId", filters.categoryId);
+    if (filters.comparison && filters.comparison !== "none") params.set("comparison", filters.comparison);
+    const query = params.toString();
+    return request(`/lifespaces/${id}/analytics${query ? `?${query}` : ""}`);
+  },
   getPublicReport: (slug, passcode) => request(withPasscode(`/public/lifespaces/${slug}/report`, passcode), { auth: false }),
 
   listCategories: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/categories`),
