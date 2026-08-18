@@ -26,6 +26,11 @@ describe("Contributions", () => {
   beforeEach(() => {
     Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn() }, configurable: true });
     window.alert = vi.fn();
+    // Mock all API methods
+    api.listContributions = vi.fn();
+    api.createContribution = vi.fn();
+    api.updateContribution = vi.fn();
+    api.listCategories = vi.fn().mockResolvedValue({ categories: [] });
   });
 
   it("prompts to create a life space when there is none yet", () => {
