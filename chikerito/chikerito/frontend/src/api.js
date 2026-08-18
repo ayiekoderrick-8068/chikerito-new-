@@ -63,7 +63,17 @@ export const api = {
   updateCategory: (id, payload) => request(`/categories/${id}`, { method: "PATCH", body: payload }),
   deleteCategory: (id) => request(`/categories/${id}`, { method: "DELETE" }),
 
-  listExpenses: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/expenses`),
+  listExpenses: (lifeSpaceId, filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.status) params.set("status", filters.status);
+    if (filters.categoryId) params.set("categoryId", filters.categoryId);
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.before) params.set("before", filters.before);
+    if (filters.limit) params.set("limit", filters.limit);
+    const qs = params.toString();
+    return request(`/lifespaces/${lifeSpaceId}/expenses${qs ? `?${qs}` : ""}`);
+  },
   createExpense: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/expenses`, { method: "POST", body: payload }),
   updateExpense: (id, payload) => request(`/expenses/${id}`, { method: "PATCH", body: payload }),
   deleteExpense: (id) => request(`/expenses/${id}`, { method: "DELETE" }),
@@ -76,6 +86,8 @@ export const api = {
   deleteRecurringExpense: (id) => request(`/recurring-expenses/${id}`, { method: "DELETE" }),
 
   listContributions: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/contributions`),
+  createContribution: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/contributions`, { method: "POST", body: payload }),
+  updateContribution: (id, payload) => request(`/contributions/${id}`, { method: "PATCH", body: payload }),
   publicContribute: (slug, payload, passcode) =>
     request(withPasscode(`/public/lifespaces/${slug}/contribute`, passcode), { method: "POST", body: payload, auth: false }),
 
