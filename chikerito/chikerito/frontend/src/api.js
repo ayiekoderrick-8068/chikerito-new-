@@ -68,6 +68,13 @@ export const api = {
   updateExpense: (id, payload) => request(`/expenses/${id}`, { method: "PATCH", body: payload }),
   deleteExpense: (id) => request(`/expenses/${id}`, { method: "DELETE" }),
 
+  listRecurringExpenses: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/recurring-expenses`),
+  createRecurringExpense: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/recurring-expenses`, { method: "POST", body: payload }),
+  updateRecurringExpense: (id, payload) => request(`/recurring-expenses/${id}`, { method: "PATCH", body: payload }),
+  pauseRecurringExpense: (id) => request(`/recurring-expenses/${id}/pause`, { method: "POST" }),
+  resumeRecurringExpense: (id) => request(`/recurring-expenses/${id}/resume`, { method: "POST" }),
+  deleteRecurringExpense: (id) => request(`/recurring-expenses/${id}`, { method: "DELETE" }),
+
   listContributions: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/contributions`),
   publicContribute: (slug, payload, passcode) =>
     request(withPasscode(`/public/lifespaces/${slug}/contribute`, passcode), { method: "POST", body: payload, auth: false }),

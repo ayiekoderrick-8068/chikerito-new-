@@ -8,6 +8,7 @@ const links = [
   { to: "/app/finance", label: "Finance Hub" },
   { to: "/app/budget-spreadsheet", label: "Budget Spreadsheet" },
   { to: "/app/expenses", label: "Expense Tracker" },
+  { to: "/app/recurring-expenses", label: "Recurring Expenses" },
   { to: "/app/contributions", label: "Contributions" },
   { to: "/app/analytics", label: "Analytics" },
   { to: "/app/team", label: "Team" },

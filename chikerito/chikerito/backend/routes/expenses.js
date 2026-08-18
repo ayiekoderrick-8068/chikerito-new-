@@ -4,10 +4,12 @@ const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const { requireMember, requireCapability, requireResourceCapability } = require("../middleware/authorize");
 const { pushNotification } = require("../notify");
+const { runDueOccurrences } = require("../recurrence");
 
 const router = express.Router();
 
 router.get("/lifespaces/:lifeSpaceId/expenses", requireAuth, requireMember("lifeSpaceId"), (req, res) => {
+  runDueOccurrences(req.params.lifeSpaceId);
   const expenses = db.table("expenses").where((e) => e.life_space_id === req.params.lifeSpaceId);
   res.json({ expenses: expenses.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) });
 });

@@ -107,6 +107,23 @@ async function createExpense(token, lifeSpaceId, overrides = {}) {
 // directly, since that's how it actually works now. `invitee` is a full
 // registered-user object (as returned by registerUser()) — accepting needs
 // their own token, not just their email.
+// Defaults startDate to tomorrow (relative to real time) so a bare call
+// never has anything due yet — tests that care about generation set
+// startDate/endDate explicitly, usually alongside jest fake timers for a
+// fixed "today".
+async function createRecurringExpense(token, lifeSpaceId, overrides = {}) {
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const payload = { vendor: unique("Recurring Vendor "), amount: 100, frequency: "monthly", startDate: tomorrow, ...overrides };
+  const res = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/recurring-expenses`)
+    .set(auth(token))
+    .send(payload);
+  if (res.status !== 201) {
+    throw new Error(`createRecurringExpense failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return res.body.recurringExpense;
+}
+
 async function addTeamMember(ownerToken, lifeSpaceId, invitee, role) {
   const inviteRes = await api()
     .post(`/api/lifespaces/${lifeSpaceId}/invitations`)
@@ -201,6 +218,7 @@ module.exports = {
   createLifeSpace,
   createCategory,
   createExpense,
+  createRecurringExpense,
   createTask,
   addTeamMember,
   createNotification,

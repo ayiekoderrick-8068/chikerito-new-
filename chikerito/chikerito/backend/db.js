@@ -21,6 +21,7 @@ const EMPTY = {
   budget_categories: [],
   contributions: [],
   expenses: [],
+  recurring_expenses: [],
   tasks: [],
   notifications: [],
 };

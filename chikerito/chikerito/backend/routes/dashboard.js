@@ -3,11 +3,13 @@ const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const { requireMember } = require("../middleware/authorize");
 const { sanitizeLifeSpace } = require("../serialize");
+const { runDueOccurrences } = require("../recurrence");
 
 const router = express.Router();
 
 router.get("/lifespaces/:id/dashboard", requireAuth, requireMember("id"), (req, res) => {
   const lifeSpace = req.lifeSpace;
+  runDueOccurrences(lifeSpace.id);
 
   const contributions = db.table("contributions").where((c) => c.life_space_id === lifeSpace.id);
   const expenses = db.table("expenses").where((e) => e.life_space_id === lifeSpace.id);

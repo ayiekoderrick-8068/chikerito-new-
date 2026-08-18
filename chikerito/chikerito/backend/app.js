@@ -15,6 +15,7 @@ const reportRoutes = require("./routes/report");
 const taskRoutes = require("./routes/tasks");
 const notificationRoutes = require("./routes/notifications");
 const invitationRoutes = require("./routes/invitations");
+const recurringExpenseRoutes = require("./routes/recurringExpenses");
 
 function createApp() {
   const app = express();
@@ -34,6 +35,7 @@ function createApp() {
   app.use("/api", taskRoutes);         // /api/lifespaces/:id/tasks, /api/tasks/:id
   app.use("/api", notificationRoutes); // /api/lifespaces/:id/notifications, /api/notifications/:id
   app.use("/api", invitationRoutes);   // /api/lifespaces/:id/invitations, /api/invitations/:id/accept|decline, /api/invitations/pending
+  app.use("/api", recurringExpenseRoutes); // /api/lifespaces/:id/recurring-expenses, /api/recurring-expenses/:id
 
   app.use((req, res) => res.status(404).json({ error: "Not found" }));
 

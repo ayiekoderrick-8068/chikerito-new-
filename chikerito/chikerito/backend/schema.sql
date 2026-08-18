@@ -103,7 +103,22 @@ CREATE TABLE expenses (
   payment_date  DATE,
   status        VARCHAR(20) DEFAULT 'paid', -- pending | paid | overdue
   notes         TEXT,
+  recurring_expense_id UUID REFERENCES recurring_expenses(id), -- set only for auto-generated occurrences
   created_at    TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE recurring_expenses (
+  id                UUID PRIMARY KEY,
+  life_space_id     UUID REFERENCES life_spaces(id),
+  category_id       UUID REFERENCES budget_categories(id) NULL,
+  vendor            VARCHAR(255) NOT NULL,
+  amount            NUMERIC(12,2) NOT NULL, -- must be > 0
+  frequency         VARCHAR(20) NOT NULL,   -- weekly | biweekly | monthly | quarterly | yearly
+  start_date        DATE NOT NULL,
+  end_date          DATE,                  -- null = no end
+  status            VARCHAR(20) DEFAULT 'active', -- active | paused | stopped
+  last_generated_date DATE,                -- date of the most recently materialized occurrence; null until the first run
+  created_at        TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE tasks (
