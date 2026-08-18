@@ -23,6 +23,7 @@ const EMPTY = {
   expenses: [],
   recurring_expenses: [],
   tasks: [],
+  task_dependencies: [],
   notifications: [],
 };
 

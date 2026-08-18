@@ -13,6 +13,7 @@ async function seed() {
     contributions: [],
     expenses: [],
     tasks: [],
+    task_dependencies: [],
     notifications: [],
   });
 
