@@ -12,6 +12,9 @@ async function seed() {
     budget_categories: [],
     contributions: [],
     expenses: [],
+    recurring_expenses: [],
+    budget_scenarios: [],
+    budget_scenario_adjustments: [],
     tasks: [],
     notifications: [],
   });
