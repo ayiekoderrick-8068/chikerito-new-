@@ -5,6 +5,7 @@ const { requireAuth } = require("../middleware/auth");
 const { requireMember, requireCapability, requireResourceCapability } = require("../middleware/authorize");
 const { pushNotification } = require("../notify");
 const { runDueOccurrences } = require("../recurrence");
+const { normalizeTransaction, monetaryFields, transactionView, baseAmount } = require("../currency");
 
 const router = express.Router();
 const PAGE_SIZE = 20;
@@ -41,19 +42,39 @@ router.get("/lifespaces/:lifeSpaceId/expenses", requireAuth, requireMember("life
 
   const limit = Math.max(1, Math.min(Number(limitParam) || PAGE_SIZE, 100));
   const page = expenses.slice(0, limit);
-  res.json({ expenses: page, hasMore: expenses.length > limit });
+  const baseCurrency = req.lifeSpace.currency || "USD";
+  res.json({
+    expenses: page.map((expense) => ({ ...expense, money: transactionView(expense, baseCurrency) })),
+    baseCurrency,
+    hasMore: expenses.length > limit,
+  });
 });
 
 router.post("/lifespaces/:lifeSpaceId/expenses", requireAuth, requireCapability("expense:manage", "lifeSpaceId"), (req, res) => {
-  const { categoryId, vendor, amount, plannedAmount, invoiceUrl, receiptUrl, paymentDate, status, notes } = req.body;
+  const { categoryId, vendor, amount, plannedAmount, currency, exchangeRate, invoiceUrl, receiptUrl, paymentDate, status, notes } = req.body;
   if (!vendor || (!amount && !plannedAmount)) return res.status(400).json({ error: "vendor and amount (or plannedAmount) are required" });
+  const lifeSpace = req.lifeSpace;
+  if (categoryId) {
+    const category = db.table("budget_categories").find(categoryId);
+    if (!category || category.life_space_id !== lifeSpace.id) return res.status(400).json({ error: "categoryId must belong to this life space" });
+  }
+  const plannedInput = plannedAmount !== undefined ? plannedAmount : amount;
+  const reference = normalizeTransaction({ amount: Number(amount) > 0 ? amount : plannedInput, currency, exchangeRate }, lifeSpace);
+  if (reference.error) return res.status(400).json({ error: reference.error });
+  const actual = Number(amount) > 0 ? reference : { ...reference, originalAmount: 0, baseAmount: 0 };
+  const planned = Number(plannedInput) > 0
+    ? normalizeTransaction({ amount: plannedInput, currency: reference.currency, exchangeRate: reference.exchangeRate }, lifeSpace, "plannedAmount")
+    : { ...actual, originalAmount: 0, baseAmount: 0 };
+  if (planned.error) return res.status(400).json({ error: planned.error });
   const expense = db.table("expenses").insert({
     id: uuid(),
     life_space_id: req.params.lifeSpaceId,
     category_id: categoryId || null,
     vendor,
-    planned_amount: plannedAmount !== undefined ? Number(plannedAmount) : Number(amount) || 0,
-    amount: Number(amount) || 0,
+    planned_amount: planned.originalAmount,
+    amount: actual.originalAmount,
+    ...monetaryFields(actual),
+    ...monetaryFields(planned, "planned"),
     invoice_url: invoiceUrl || null,
     receipt_url: receiptUrl || null,
     payment_date: paymentDate || new Date().toISOString().slice(0, 10),
@@ -65,18 +86,18 @@ router.post("/lifespaces/:lifeSpaceId/expenses", requireAuth, requireCapability(
   const category = categoryId ? db.table("budget_categories").find(categoryId) : null;
   if (category) {
     const expenses = db.table("expenses").where((e) => e.category_id === category.id);
-    const spent = expenses.reduce((s, e) => s + e.amount, 0);
+    const spent = expenses.reduce((s, e) => s + baseAmount(e, lifeSpace.currency), 0);
     if (category.budget_amount > 0 && spent > category.budget_amount) {
       pushNotification(req.params.lifeSpaceId, "budget_warning", `${category.name} budget exceeded by $${(spent - category.budget_amount).toFixed(2)}`);
     }
   }
-  pushNotification(req.params.lifeSpaceId, "expense_added", `Expense recorded: ${vendor} — $${Number(amount).toFixed(2)}`);
+  pushNotification(req.params.lifeSpaceId, "expense_added", `Expense recorded: ${vendor} — ${actual.currency} ${actual.originalAmount.toFixed(2)}`);
 
-  res.status(201).json({ expense });
+  res.status(201).json({ expense: { ...expense, money: transactionView(expense, lifeSpace.currency) } });
 });
 
 router.patch("/expenses/:id", requireAuth, requireResourceCapability("expenses", "expense:manage"), (req, res) => {
-  const allowed = ["vendor", "amount", "plannedAmount", "invoiceUrl", "receiptUrl", "paymentDate", "status", "notes", "categoryId"];
+  const allowed = ["vendor", "invoiceUrl", "receiptUrl", "paymentDate", "status", "notes", "categoryId"];
   const columnMap = { invoiceUrl: "invoice_url", receiptUrl: "receipt_url", paymentDate: "payment_date", categoryId: "category_id", plannedAmount: "planned_amount" };
   const patch = {};
   for (const key of allowed) {
@@ -84,8 +105,35 @@ router.patch("/expenses/:id", requireAuth, requireResourceCapability("expenses",
       patch[columnMap[key] || key] = key === "amount" || key === "plannedAmount" ? Number(req.body[key]) : req.body[key];
     }
   }
+  const lifeSpace = db.table("life_spaces").find(req.resource.life_space_id);
+  if (req.body.categoryId) {
+    const category = db.table("budget_categories").find(req.body.categoryId);
+    if (!category || category.life_space_id !== lifeSpace.id) return res.status(400).json({ error: "categoryId must belong to this life space" });
+  }
+  if (["amount", "currency", "exchangeRate"].some((key) => req.body[key] !== undefined)) {
+    const existing = transactionView(req.resource, lifeSpace.currency);
+    const normalized = normalizeTransaction({
+      amount: req.body.amount ?? existing.originalAmount,
+      currency: req.body.currency ?? existing.currency,
+      exchangeRate: req.body.exchangeRate ?? existing.exchangeRate,
+    }, lifeSpace);
+    if (normalized.error) return res.status(400).json({ error: normalized.error });
+    patch.amount = normalized.originalAmount;
+    Object.assign(patch, monetaryFields(normalized));
+  }
+  if (req.body.plannedAmount !== undefined) {
+    const existing = transactionView(req.resource, lifeSpace.currency);
+    const normalized = normalizeTransaction({
+      amount: req.body.plannedAmount,
+      currency: req.body.currency ?? existing.currency,
+      exchangeRate: req.body.exchangeRate ?? existing.exchangeRate,
+    }, lifeSpace, "plannedAmount");
+    if (normalized.error) return res.status(400).json({ error: normalized.error });
+    patch.planned_amount = normalized.originalAmount;
+    Object.assign(patch, monetaryFields(normalized, "planned"));
+  }
   const updated = db.table("expenses").update(req.params.id, patch);
-  res.json({ expense: updated });
+  res.json({ expense: { ...updated, money: transactionView(updated, lifeSpace.currency) } });
 });
 
 router.delete("/expenses/:id", requireAuth, requireResourceCapability("expenses", "expense:manage"), (req, res) => {

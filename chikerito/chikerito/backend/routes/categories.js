@@ -2,6 +2,7 @@ const express = require("express");
 const { v4: uuid } = require("uuid");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
+const { baseAmount } = require("../currency");
 const { requireMember, requireCapability, requireResourceCapability } = require("../middleware/authorize");
 
 const router = express.Router();
@@ -43,8 +44,9 @@ function withComputed(categories, lifeSpaceId) {
   const contributions = db.table("contributions").where((c) => c.life_space_id === lifeSpaceId);
   const expenses = db.table("expenses").where((e) => e.life_space_id === lifeSpaceId);
   return categories.map((c) => {
-    const raised = contributions.filter((x) => x.category_id === c.id).reduce((s, x) => s + x.amount, 0);
-    const spent = expenses.filter((x) => x.category_id === c.id).reduce((s, x) => s + x.amount, 0);
+    const lifeSpace = db.table("life_spaces").find(lifeSpaceId);
+    const raised = contributions.filter((x) => x.category_id === c.id).reduce((s, x) => s + baseAmount(x, lifeSpace?.currency), 0);
+    const spent = expenses.filter((x) => x.category_id === c.id).reduce((s, x) => s + baseAmount(x, lifeSpace?.currency), 0);
     return {
       ...c,
       raised,

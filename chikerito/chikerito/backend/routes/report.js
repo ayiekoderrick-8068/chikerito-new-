@@ -2,6 +2,7 @@ const express = require("express");
 const db = require("../db");
 const { findPublicLifeSpace, checkPublicAccess } = require("../publicAccess");
 const { isCountable } = require("./contributions");
+const { baseAmount } = require("../currency");
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.get("/public/lifespaces/:slug/report", (req, res) => {
   const contributions = allContributions.filter(isCountable);
   const categories = db.table("budget_categories").where((c) => c.life_space_id === lifeSpace.id);
 
-  const raised = contributions.reduce((s, c) => s + c.amount, 0);
+  const raised = contributions.reduce((s, c) => s + baseAmount(c, lifeSpace.currency), 0);
   const remainingGoal = Math.max(lifeSpace.goal_amount - raised, 0);
   const progress = lifeSpace.goal_amount > 0 ? Math.min(Math.round((raised / lifeSpace.goal_amount) * 100), 100) : 0;
 
@@ -24,8 +25,8 @@ router.get("/public/lifespaces/:slug/report", (req, res) => {
   if (lifeSpace.show_budget_public) {
     const expenses = db.table("expenses").where((e) => e.life_space_id === lifeSpace.id);
     categoryBreakdown = categories.map((c) => {
-      const catRaised = contributions.filter((x) => x.category_id === c.id).reduce((s, x) => s + x.amount, 0);
-      const catSpent = expenses.filter((x) => x.category_id === c.id).reduce((s, x) => s + x.amount, 0);
+      const catRaised = contributions.filter((x) => x.category_id === c.id).reduce((s, x) => s + baseAmount(x, lifeSpace.currency), 0);
+      const catSpent = expenses.filter((x) => x.category_id === c.id).reduce((s, x) => s + baseAmount(x, lifeSpace.currency), 0);
       return {
         id: c.id,
         name: c.name,
@@ -50,7 +51,7 @@ router.get("/public/lifespaces/:slug/report", (req, res) => {
       coverImage: lifeSpace.cover_image || null,
       allowIndexing: !!lifeSpace.allow_indexing,
     },
-    stats: { goal: lifeSpace.goal_amount, raised, remainingGoal, progress, contributorCount: contributions.length },
+    stats: { goal: lifeSpace.goal_amount, raised, remainingGoal, progress, contributorCount: contributions.length, currency: lifeSpace.currency || "USD" },
     categoryBreakdown,
     budgetVisible: !!lifeSpace.show_budget_public,
   });

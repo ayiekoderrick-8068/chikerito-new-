@@ -4,6 +4,7 @@ const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const { requireMember, requireCapability, requireResourceCapability } = require("../middleware/authorize");
 const { FREQUENCIES, nextOccurrence, runDueOccurrences } = require("../recurrence");
+const { normalizeTransaction, monetaryFields, transactionView } = require("../currency");
 
 const router = express.Router();
 
@@ -36,8 +37,8 @@ function validateCreateOrUpdate(body, { partial = false } = {}) {
   return null;
 }
 
-function serialize(recurring) {
-  return { ...recurring, nextOccurrence: nextOccurrence(recurring) };
+function serialize(recurring, baseCurrency = "USD") {
+  return { ...recurring, nextOccurrence: nextOccurrence(recurring), money: transactionView(recurring, baseCurrency) };
 }
 
 router.get("/lifespaces/:lifeSpaceId/recurring-expenses", requireAuth, requireMember("lifeSpaceId"), (req, res) => {
@@ -46,20 +47,27 @@ router.get("/lifespaces/:lifeSpaceId/recurring-expenses", requireAuth, requireMe
     .table("recurring_expenses")
     .where((r) => r.life_space_id === req.params.lifeSpaceId)
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  res.json({ recurringExpenses: rules.map(serialize) });
+  res.json({ recurringExpenses: rules.map((rule) => serialize(rule, req.lifeSpace.currency)), baseCurrency: req.lifeSpace.currency || "USD" });
 });
 
 router.post("/lifespaces/:lifeSpaceId/recurring-expenses", requireAuth, requireCapability("expense:manage", "lifeSpaceId"), (req, res) => {
   const error = validateCreateOrUpdate(req.body);
   if (error) return res.status(400).json({ error });
 
-  const { categoryId, vendor, amount, frequency, startDate, endDate } = req.body;
+  const { categoryId, vendor, amount, currency, exchangeRate, frequency, startDate, endDate } = req.body;
+  if (categoryId) {
+    const category = db.table("budget_categories").find(categoryId);
+    if (!category || category.life_space_id !== req.lifeSpace.id) return res.status(400).json({ error: "categoryId must belong to this life space" });
+  }
+  const normalized = normalizeTransaction({ amount, currency, exchangeRate }, req.lifeSpace);
+  if (normalized.error) return res.status(400).json({ error: normalized.error });
   const rule = db.table("recurring_expenses").insert({
     id: uuid(),
     life_space_id: req.params.lifeSpaceId,
     category_id: categoryId || null,
     vendor,
-    amount: Number(amount),
+    amount: normalized.originalAmount,
+    ...monetaryFields(normalized),
     frequency,
     start_date: startDate,
     end_date: endDate || null,
@@ -70,7 +78,7 @@ router.post("/lifespaces/:lifeSpaceId/recurring-expenses", requireAuth, requireC
 
   runDueOccurrences(req.params.lifeSpaceId);
   const fresh = db.table("recurring_expenses").find(rule.id);
-  res.status(201).json({ recurringExpense: serialize(fresh) });
+  res.status(201).json({ recurringExpense: serialize(fresh, req.lifeSpace.currency) });
 });
 
 router.patch(
@@ -81,7 +89,7 @@ router.patch(
     const error = validateCreateOrUpdate(req.body, { partial: true });
     if (error) return res.status(400).json({ error });
 
-    const allowed = ["vendor", "amount", "categoryId", "frequency", "startDate", "endDate"];
+    const allowed = ["vendor", "categoryId", "frequency", "startDate", "endDate"];
     const columnMap = { categoryId: "category_id", startDate: "start_date", endDate: "end_date" };
     const patch = {};
     for (const key of allowed) {
@@ -89,8 +97,24 @@ router.patch(
         patch[columnMap[key] || key] = key === "amount" ? Number(req.body[key]) : req.body[key];
       }
     }
+    const lifeSpace = db.table("life_spaces").find(req.resource.life_space_id);
+    if (req.body.categoryId) {
+      const category = db.table("budget_categories").find(req.body.categoryId);
+      if (!category || category.life_space_id !== lifeSpace.id) return res.status(400).json({ error: "categoryId must belong to this life space" });
+    }
+    if (["amount", "currency", "exchangeRate"].some((key) => req.body[key] !== undefined)) {
+      const existing = transactionView(req.resource, lifeSpace.currency);
+      const normalized = normalizeTransaction({
+        amount: req.body.amount ?? existing.originalAmount,
+        currency: req.body.currency ?? existing.currency,
+        exchangeRate: req.body.exchangeRate ?? existing.exchangeRate,
+      }, lifeSpace);
+      if (normalized.error) return res.status(400).json({ error: normalized.error });
+      patch.amount = normalized.originalAmount;
+      Object.assign(patch, monetaryFields(normalized));
+    }
     const updated = db.table("recurring_expenses").update(req.params.id, patch);
-    res.json({ recurringExpense: serialize(updated) });
+    res.json({ recurringExpense: serialize(updated, lifeSpace.currency) });
   }
 );
 
@@ -103,7 +127,8 @@ router.post(
       return res.status(409).json({ error: "Only an active recurring expense can be paused" });
     }
     const updated = db.table("recurring_expenses").update(req.params.id, { status: "paused" });
-    res.json({ recurringExpense: serialize(updated) });
+    const lifeSpace = db.table("life_spaces").find(updated.life_space_id);
+    res.json({ recurringExpense: serialize(updated, lifeSpace?.currency) });
   }
 );
 
@@ -122,7 +147,8 @@ router.post(
       status: "active",
       last_generated_date: today,
     });
-    res.json({ recurringExpense: serialize(updated) });
+    const lifeSpace = db.table("life_spaces").find(updated.life_space_id);
+    res.json({ recurringExpense: serialize(updated, lifeSpace?.currency) });
   }
 );
 

@@ -16,6 +16,7 @@ const taskRoutes = require("./routes/tasks");
 const notificationRoutes = require("./routes/notifications");
 const invitationRoutes = require("./routes/invitations");
 const recurringExpenseRoutes = require("./routes/recurringExpenses");
+const currencyRoutes = require("./routes/currencies");
 
 function createApp() {
   const app = express();
@@ -24,6 +25,7 @@ function createApp() {
   app.use(express.json({ limit: "6mb" })); // cover photos are uploaded as base64 data URLs
 
   app.get("/api/health", (req, res) => res.json({ status: "ok", service: "chikerito-api" }));
+  app.use("/api", currencyRoutes);
 
   app.use("/api/auth", authRoutes);
   app.use("/api/lifespaces", lifeSpaceRoutes);

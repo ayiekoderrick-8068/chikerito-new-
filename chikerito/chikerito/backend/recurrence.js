@@ -6,6 +6,7 @@
 // repeatedly on the same day is a no-op — see last_generated_date below.
 const { v4: uuid } = require("uuid");
 const db = require("./db");
+const { monetaryFields, transactionView } = require("./currency");
 
 const FREQUENCIES = ["weekly", "biweekly", "monthly", "quarterly", "yearly"];
 
@@ -83,6 +84,8 @@ function runDueOccurrences(lifeSpaceId) {
     const due = dueDates(recurring, today);
     if (!due.length) return;
     due.forEach((date) => {
+      const lifeSpace = db.table("life_spaces").find(lifeSpaceId);
+      const money = transactionView(recurring, lifeSpace?.currency || "USD");
       db.table("expenses").insert({
         id: uuid(),
         life_space_id: lifeSpaceId,
@@ -90,6 +93,20 @@ function runDueOccurrences(lifeSpaceId) {
         vendor: recurring.vendor,
         planned_amount: recurring.amount,
         amount: recurring.amount,
+        ...monetaryFields({
+          originalAmount: money.originalAmount,
+          currency: money.currency,
+          exchangeRate: money.exchangeRate,
+          baseAmount: money.baseAmount,
+          baseCurrency: money.baseCurrency,
+        }),
+        ...monetaryFields({
+          originalAmount: money.originalAmount,
+          currency: money.currency,
+          exchangeRate: money.exchangeRate,
+          baseAmount: money.baseAmount,
+          baseCurrency: money.baseCurrency,
+        }, "planned"),
         invoice_url: null,
         receipt_url: null,
         payment_date: date,

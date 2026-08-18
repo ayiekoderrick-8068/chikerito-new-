@@ -85,6 +85,11 @@ CREATE TABLE contributions (
   category_id   UUID REFERENCES budget_categories(id) NULL,
   contributor_name VARCHAR(120) DEFAULT 'Anonymous',
   amount        NUMERIC(12,2) NOT NULL,
+  original_amount NUMERIC(12,2),
+  currency      VARCHAR(10),
+  exchange_rate NUMERIC(18,8),
+  base_amount   NUMERIC(12,2),
+  base_currency VARCHAR(10),
   message       TEXT,
   payment_method VARCHAR(30) DEFAULT 'card',
   status        VARCHAR(20) DEFAULT 'completed', -- pending | completed | failed | refunded
@@ -98,6 +103,16 @@ CREATE TABLE expenses (
   vendor        VARCHAR(255),
   planned_amount NUMERIC(12,2) DEFAULT 0, -- what this line item was budgeted for, before it's actually paid
   amount        NUMERIC(12,2) NOT NULL,   -- actual amount paid/owed so far (0 if still only planned)
+  original_amount NUMERIC(12,2),
+  currency      VARCHAR(10),
+  exchange_rate NUMERIC(18,8),
+  base_amount   NUMERIC(12,2),
+  base_currency VARCHAR(10),
+  planned_original_amount NUMERIC(12,2),
+  planned_currency VARCHAR(10),
+  planned_exchange_rate NUMERIC(18,8),
+  planned_base_amount NUMERIC(12,2),
+  planned_base_currency VARCHAR(10),
   invoice_url   VARCHAR(500),
   receipt_url   VARCHAR(500),
   payment_date  DATE,
@@ -113,6 +128,11 @@ CREATE TABLE recurring_expenses (
   category_id       UUID REFERENCES budget_categories(id) NULL,
   vendor            VARCHAR(255) NOT NULL,
   amount            NUMERIC(12,2) NOT NULL, -- must be > 0
+  original_amount   NUMERIC(12,2),
+  currency          VARCHAR(10),
+  exchange_rate     NUMERIC(18,8),
+  base_amount       NUMERIC(12,2),
+  base_currency     VARCHAR(10),
   frequency         VARCHAR(20) NOT NULL,   -- weekly | biweekly | monthly | quarterly | yearly
   start_date        DATE NOT NULL,
   end_date          DATE,                  -- null = no end
