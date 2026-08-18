@@ -3,10 +3,12 @@ import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
 import { can } from "../permissions.js";
+import { formatMoney } from "../currency.js";
 
 export default function FinanceHub() {
   const { currentId, current } = useLifeSpace();
   const canManage = can(current?.role, "category:manage");
+  const money = (value) => formatMoney(value, current?.currency || "USD");
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -68,9 +70,9 @@ export default function FinanceHub() {
       <Topbar title="Finance Hub" />
       <div className="page-body">
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-          <div className="stat-card"><div className="label">Total Budget</div><div className="value">${totals.budget.toLocaleString()}</div></div>
-          <div className="stat-card"><div className="label">Total Raised</div><div className="value">${totals.raised.toLocaleString()}</div></div>
-          <div className="stat-card accent"><div className="label">Total Spent</div><div className="value">${totals.spent.toLocaleString()}</div></div>
+          <div className="stat-card"><div className="label">Total Budget</div><div className="value">{money(totals.budget)}</div></div>
+          <div className="stat-card"><div className="label">Total Raised</div><div className="value">{money(totals.raised)}</div></div>
+          <div className="stat-card accent"><div className="label">Total Spent</div><div className="value">{money(totals.spent)}</div></div>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "24px 0 16px" }}>
@@ -94,12 +96,12 @@ export default function FinanceHub() {
                 </div>
                 <div className="progress-track"><div className="progress-fill" style={{ width: `${c.progress}%` }} /></div>
                 <div className="cat-figures">
-                  <span>Raised ${c.raised.toLocaleString()}</span>
-                  <span>Budget ${c.budget_amount.toLocaleString()}</span>
+                  <span>Raised {money(c.raised)}</span>
+                  <span>Budget {money(c.budget_amount)}</span>
                 </div>
                 <div className="cat-figures">
-                  <span>Spent ${c.spent.toLocaleString()}</span>
-                  <span>Remaining ${c.remainingBudget.toLocaleString()}</span>
+                  <span>Spent {money(c.spent)}</span>
+                  <span>Remaining {money(c.remainingBudget)}</span>
                 </div>
               </div>
             ))}
@@ -118,7 +120,7 @@ export default function FinanceHub() {
                 <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Photography" />
               </div>
               <div className="field">
-                <label>Budget amount (USD)</label>
+                <label>Budget amount ({current?.currency || "USD"})</label>
                 <input type="number" min="0" required value={form.budgetAmount} onChange={(e) => setForm({ ...form, budgetAmount: e.target.value })} />
               </div>
               <div className="modal-actions">

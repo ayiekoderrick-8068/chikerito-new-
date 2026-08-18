@@ -466,3 +466,23 @@ button { font-family: inherit; cursor: pointer; }
 @media (max-width: 640px) {
   .notification-panel { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; }
 }
+.currency-conversion {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.currency-help,
+.currency-error {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.currency-error {
+  color: var(--danger);
+}

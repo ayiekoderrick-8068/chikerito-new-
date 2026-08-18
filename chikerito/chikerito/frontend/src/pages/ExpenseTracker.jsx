@@ -3,16 +3,18 @@ import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
 import { can } from "../permissions.js";
+import { FALLBACK_CURRENCIES, conversionLabel, formatMoney, moneyView } from "../currency.js";
 
 const STATUSES = ["", "paid", "pending", "overdue"];
 
-function emptyForm() {
-  return { vendor: "", categoryId: "", amount: "", paymentDate: "", status: "paid", notes: "", hasReceipt: false };
+function emptyForm(baseCurrency = "USD") {
+  return { vendor: "", categoryId: "", amount: "", currency: baseCurrency, exchangeRate: "", paymentDate: "", status: "paid", notes: "", hasReceipt: false };
 }
 
 export default function ExpenseTracker() {
   const { currentId, current } = useLifeSpace();
   const canManage = can(current?.role, "expense:manage");
+  const baseCurrency = current?.currency || "USD";
 
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -87,17 +89,20 @@ export default function ExpenseTracker() {
 
   function openCreate() {
     setEditing(null);
-    setForm(emptyForm());
+    setForm(emptyForm(baseCurrency));
     setFormError("");
     setShowModal(true);
   }
 
   function openEdit(expense) {
+    const money = moneyView(expense, baseCurrency);
     setEditing(expense);
     setForm({
       vendor: expense.vendor,
       categoryId: expense.category_id || "",
       amount: expense.amount,
+      currency: money.currency,
+      exchangeRate: money.exchangeRate,
       paymentDate: expense.payment_date || "",
       status: expense.status,
       notes: expense.notes || "",
@@ -118,6 +123,8 @@ export default function ExpenseTracker() {
         vendor: form.vendor,
         categoryId: form.categoryId || null,
         amount: form.amount,
+        currency: form.currency,
+        exchangeRate: form.currency === baseCurrency ? 1 : form.exchangeRate,
         paymentDate: form.paymentDate,
         status: form.status,
         notes: form.notes,
@@ -223,7 +230,10 @@ export default function ExpenseTracker() {
                     <tr key={e.id}>
                       <td>{e.vendor}</td>
                       <td>{categoryName(e.category_id)}</td>
-                      <td>${Number(e.amount).toLocaleString()}</td>
+                      <td>
+                        <strong>{formatMoney(moneyView(e, baseCurrency).originalAmount, moneyView(e, baseCurrency).currency, { showCode: moneyView(e, baseCurrency).currency !== baseCurrency })}</strong>
+                        {conversionLabel(e, baseCurrency) && <small className="currency-conversion">≈ {conversionLabel(e, baseCurrency)}</small>}
+                      </td>
                       <td>{e.payment_date}</td>
                       <td>
                         <span className={`badge ${e.status === "paid" ? "badge-success" : e.status === "overdue" ? "badge-danger" : "badge-warning"}`}>
@@ -260,8 +270,8 @@ export default function ExpenseTracker() {
             {formError && <div className="error-banner">{formError}</div>}
             <form onSubmit={handleSubmit}>
               <div className="field">
-                <label>Vendor</label>
-                <input required value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="e.g. Elegant Events" />
+                <label htmlFor="expense-vendor">Vendor</label>
+                <input id="expense-vendor" required value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="e.g. Elegant Events" />
               </div>
               <div className="field">
                 <label>Category</label>
@@ -273,9 +283,20 @@ export default function ExpenseTracker() {
                 </select>
               </div>
               <div className="field">
-                <label>Amount (USD)</label>
-                <input type="number" min="0.01" step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                <label htmlFor="expense-amount">Amount ({form.currency})</label>
+                <input id="expense-amount" type="number" min="0.01" step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
               </div>
+              <div className="field">
+                <label htmlFor="expense-currency">Currency</label>
+                <select id="expense-currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value, exchangeRate: e.target.value === baseCurrency ? "1" : "" })}>
+                  {FALLBACK_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}
+                </select>
+              </div>
+              {form.currency !== baseCurrency && <div className="field">
+                <label htmlFor="expense-exchange-rate">Exchange rate ({baseCurrency} per {form.currency})</label>
+                <input id="expense-exchange-rate" type="number" min="0.000001" step="any" required value={form.exchangeRate} onChange={(e) => setForm({ ...form, exchangeRate: e.target.value })} />
+                <small className="currency-help">This rate is saved with the expense.</small>
+              </div>}
               <div className="field">
                 <label>Payment date</label>
                 <input type="date" value={form.paymentDate} onChange={(e) => setForm({ ...form, paymentDate: e.target.value })} />

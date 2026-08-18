@@ -3,6 +3,7 @@ import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
 import { can } from "../permissions.js";
+import { FALLBACK_CURRENCIES, conversionLabel, formatMoney, moneyView } from "../currency.js";
 
 const FREQUENCIES = ["weekly", "biweekly", "monthly", "quarterly", "yearly"];
 const FREQUENCY_LABEL = { weekly: "Weekly", biweekly: "Every 2 weeks", monthly: "Monthly", quarterly: "Every 3 months", yearly: "Yearly" };
@@ -11,13 +12,14 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function emptyForm() {
-  return { vendor: "", amount: "", categoryId: "", frequency: "monthly", startDate: todayStr(), endDate: "" };
+function emptyForm(baseCurrency = "USD") {
+  return { vendor: "", amount: "", currency: baseCurrency, exchangeRate: "", categoryId: "", frequency: "monthly", startDate: todayStr(), endDate: "" };
 }
 
 export default function RecurringExpenses() {
   const { currentId, current } = useLifeSpace();
   const canManage = can(current?.role, "expense:manage");
+  const baseCurrency = current?.currency || "USD";
   const [rules, setRules] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,16 +56,19 @@ export default function RecurringExpenses() {
 
   function openCreate() {
     setEditing(null);
-    setForm(emptyForm());
+    setForm(emptyForm(baseCurrency));
     setFormError("");
     setShowModal(true);
   }
 
   function openEdit(rule) {
+    const money = moneyView(rule, baseCurrency);
     setEditing(rule);
     setForm({
       vendor: rule.vendor,
       amount: rule.amount,
+      currency: money.currency,
+      exchangeRate: money.exchangeRate,
       categoryId: rule.category_id || "",
       frequency: rule.frequency,
       startDate: rule.start_date,
@@ -81,6 +86,8 @@ export default function RecurringExpenses() {
       const payload = {
         vendor: form.vendor,
         amount: form.amount,
+        currency: form.currency,
+        exchangeRate: form.currency === baseCurrency ? 1 : form.exchangeRate,
         categoryId: form.categoryId || null,
         frequency: form.frequency,
         startDate: form.startDate,
@@ -88,7 +95,7 @@ export default function RecurringExpenses() {
       };
       if (editing) {
         // start/end/frequency are set once at creation — editing only touches the rest.
-        await api.updateRecurringExpense(editing.id, { vendor: payload.vendor, amount: payload.amount, categoryId: payload.categoryId, frequency: payload.frequency });
+        await api.updateRecurringExpense(editing.id, { vendor: payload.vendor, amount: payload.amount, currency: payload.currency, exchangeRate: payload.exchangeRate, categoryId: payload.categoryId, frequency: payload.frequency });
       } else {
         await api.createRecurringExpense(currentId, payload);
       }
@@ -173,7 +180,10 @@ export default function RecurringExpenses() {
                   <tr key={r.id}>
                     <td>{r.vendor}</td>
                     <td>{categoryName(r.category_id)}</td>
-                    <td>${Number(r.amount).toLocaleString()}</td>
+                    <td>
+                      {formatMoney(moneyView(r, baseCurrency).originalAmount, moneyView(r, baseCurrency).currency, { showCode: moneyView(r, baseCurrency).currency !== baseCurrency })}
+                      {conversionLabel(r, baseCurrency) && <small className="currency-conversion">≈ {conversionLabel(r, baseCurrency)}</small>}
+                    </td>
                     <td>{FREQUENCY_LABEL[r.frequency] || r.frequency}</td>
                     <td>
                       <span className={`badge ${r.status === "active" ? "badge-success" : r.status === "paused" ? "badge-warning" : "badge-neutral"}`}>
@@ -212,8 +222,8 @@ export default function RecurringExpenses() {
             {formError && <div className="error-banner">{formError}</div>}
             <form onSubmit={handleSubmit}>
               <div className="field">
-                <label>Vendor</label>
-                <input required value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="e.g. Storage Unit" />
+                <label htmlFor="recurring-vendor">Vendor</label>
+                <input id="recurring-vendor" required value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="e.g. Storage Unit" />
               </div>
               <div className="field">
                 <label>Category</label>
@@ -225,9 +235,20 @@ export default function RecurringExpenses() {
                 </select>
               </div>
               <div className="field">
-                <label>Amount (USD)</label>
-                <input type="number" min="0.01" step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                <label htmlFor="recurring-amount">Amount ({form.currency})</label>
+                <input id="recurring-amount" type="number" min="0.01" step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
               </div>
+              <div className="field">
+                <label htmlFor="recurring-currency">Currency</label>
+                <select id="recurring-currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value, exchangeRate: e.target.value === baseCurrency ? "1" : "" })}>
+                  {FALLBACK_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}
+                </select>
+              </div>
+              {form.currency !== baseCurrency && <div className="field">
+                <label htmlFor="recurring-exchange-rate">Exchange rate ({baseCurrency} per {form.currency})</label>
+                <input id="recurring-exchange-rate" type="number" min="0.000001" step="any" required value={form.exchangeRate} onChange={(e) => setForm({ ...form, exchangeRate: e.target.value })} />
+                <small className="currency-help">Generated expenses preserve this rate snapshot.</small>
+              </div>}
               <div className="field">
                 <label>Frequency</label>
                 <select value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })}>
