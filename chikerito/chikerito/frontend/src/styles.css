@@ -466,3 +466,37 @@ button { font-family: inherit; cursor: pointer; }
 @media (max-width: 640px) {
   .notification-panel { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; }
 }
+
+/* Recurring occurrence exceptions */
+.page-heading-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.page-heading-row h2 { margin: 0 0 5px; color: var(--navy); }
+.muted { color: var(--text-muted); }
+.danger-text { color: var(--danger) !important; }
+.table-wrap { overflow-x: auto; }
+.occurrence-toolbar { display: grid; grid-template-columns: minmax(220px, 2fr) 1fr 1fr auto; gap: 12px; align-items: end; margin-bottom: 14px; }
+.occurrence-toolbar .field { margin: 0; }
+.occurrence-rule-summary { margin: 10px 2px 16px; color: var(--text-muted); }
+.occurrence-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(250px, .8fr); gap: 16px; align-items: start; }
+.occurrence-preview h3, .exception-history h3 { margin-top: 0; color: var(--navy); }
+.occurrence-preview table { width: 100%; border-collapse: collapse; }
+.occurrence-preview th, .occurrence-preview td { padding: 9px 7px; border-bottom: 1px solid var(--border); text-align: left; font-size: 12px; white-space: nowrap; }
+.occurrence-preview .row-actions { flex-wrap: nowrap; }
+.status-badge.skipped { background: #f2f3f6; color: #5f6675; }
+.status-badge.overridden { background: #fff3d6; color: #8a5700; }
+.status-badge.scheduled { background: #e7f1ff; color: #24589b; }
+.exception-history ul { list-style: none; margin: 0; padding: 0; }
+.exception-history li { display: flex; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.exception-history li > div:first-child { display: flex; flex-direction: column; gap: 3px; }
+.exception-history span, .exception-history small { color: var(--text-muted); }
+.row-actions { display: flex; gap: 4px; align-items: center; }
+.occurrence-exception-editor { width: min(620px, calc(100vw - 32px)); }
+.exception-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+@media (max-width: 900px) {
+  .occurrence-grid { grid-template-columns: 1fr; }
+  .occurrence-toolbar { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 560px) {
+  .occurrence-toolbar, .exception-fields { grid-template-columns: 1fr; }
+}

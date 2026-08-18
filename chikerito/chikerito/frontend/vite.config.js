@@ -15,5 +15,8 @@ export default defineConfig({
     globals: true,
     css: false,
     restoreMocks: true,
+    // A single worker avoids cross-file timer and jsdom contention in repeat runs.
+    minWorkers: 1,
+    maxWorkers: 1,
   },
 });

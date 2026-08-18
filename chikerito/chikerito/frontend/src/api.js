@@ -84,6 +84,19 @@ export const api = {
   pauseRecurringExpense: (id) => request(`/recurring-expenses/${id}/pause`, { method: "POST" }),
   resumeRecurringExpense: (id) => request(`/recurring-expenses/${id}/resume`, { method: "POST" }),
   deleteRecurringExpense: (id) => request(`/recurring-expenses/${id}`, { method: "DELETE" }),
+  listRecurringOccurrences: (id, { from, to, limit } = {}) => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (limit) params.set("limit", limit);
+    const query = params.toString();
+    return request(`/recurring-expenses/${id}/occurrences${query ? `?${query}` : ""}`);
+  },
+  listRecurringExceptions: (id) => request(`/recurring-expenses/${id}/exceptions`),
+  createRecurringException: (id, payload) => request(`/recurring-expenses/${id}/exceptions`, { method: "POST", body: payload }),
+  updateRecurringException: (id, payload) => request(`/recurring-expense-exceptions/${id}`, { method: "PATCH", body: payload }),
+  removeRecurringException: (id) => request(`/recurring-expense-exceptions/${id}`, { method: "DELETE" }),
+  restoreRecurringException: (id) => request(`/recurring-expense-exceptions/${id}/restore`, { method: "POST" }),
 
   listContributions: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/contributions`),
   createContribution: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/contributions`, { method: "POST", body: payload }),
