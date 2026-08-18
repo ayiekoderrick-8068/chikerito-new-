@@ -3,6 +3,7 @@
 // writes a life-space-scoped resource should resolve access through here
 // instead of re-implementing its own membership/ownership check.
 const db = require("../db");
+const { archiveConflict } = require("../lifeSpaceLifecycle");
 
 const ROLES = ["owner", "finance_manager", "event_planner", "volunteer", "editor"];
 
@@ -64,6 +65,8 @@ function requireCapability(capability, paramName = "lifeSpaceId") {
     if (!lifeSpace) return res.status(404).json({ error: "Life space not found" });
     const role = roleFor(lifeSpace, req.user.id);
     if (!role) return res.status(403).json({ error: "You do not have access to this life space" });
+    const archived = archiveConflict(lifeSpace);
+    if (archived) return res.status(409).json(archived);
     if (!hasCapability(role, capability)) {
       return res.status(403).json({ error: "Your role does not allow this action" });
     }
@@ -86,6 +89,8 @@ function requireResourceCapability(table, capability, idParam = "id") {
     if (!lifeSpace) return res.status(404).json({ error: "Not found" });
     const role = roleFor(lifeSpace, req.user.id);
     if (!role) return res.status(403).json({ error: "You do not have access to this life space" });
+    const archived = archiveConflict(lifeSpace);
+    if (archived) return res.status(409).json(archived);
     if (!hasCapability(role, capability)) {
       return res.status(403).json({ error: "Your role does not allow this action" });
     }

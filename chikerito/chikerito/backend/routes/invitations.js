@@ -112,6 +112,11 @@ router.post("/invitations/:id/accept", requireAuth, (req, res) => {
   if (!isActivePending(invitation)) {
     return res.status(409).json({ error: presentInvitation(invitation).status === "expired" ? "This invitation has expired" : "This invitation is no longer pending" });
   }
+  const acceptingLifeSpace = db.table("life_spaces").find(invitation.life_space_id);
+  if (!acceptingLifeSpace) return res.status(404).json({ error: "Life space not found" });
+  if (acceptingLifeSpace.status === "archived") {
+    return res.status(409).json({ error: "This life space is archived and cannot accept new members", archived: true });
+  }
 
   db.table("team_members").insert({
     id: uuid(),
