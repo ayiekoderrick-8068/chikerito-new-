@@ -17,6 +17,7 @@ const { notifyPasswordReset } = require("../notify");
 const router = express.Router();
 
 const RESET_TOKEN_TTL_MINUTES = 60;
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
 
 function hashToken(rawToken) {
   return crypto.createHash("sha256").update(rawToken).digest("hex");
@@ -35,7 +36,7 @@ router.post("/register", async (req, res) => {
   if (users.where((u) => u.email.toLowerCase() === email.toLowerCase()).length) {
     return res.status(409).json({ error: "An account with this email already exists" });
   }
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const user = users.insert({
     id: uuid(),
     first_name: firstName,
@@ -119,7 +120,7 @@ router.post("/reset-password", async (req, res) => {
     return res.status(400).json({ error: "This reset link is invalid or has expired" });
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   db.table("users").update(record.user_id, { password_hash: passwordHash });
   db.table("password_resets").update(record.id, { status: "used", used_at: new Date().toISOString() });
   revokeAllSessions(record.user_id);
