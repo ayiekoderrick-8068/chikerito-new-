@@ -51,10 +51,15 @@ export const api = {
   revokeSession: (id) => request(`/auth/sessions/${id}`, { method: "DELETE" }),
   revokeOtherSessions: () => request("/auth/sessions/revoke-others", { method: "POST" }),
 
-  listLifeSpaces: () => request("/lifespaces"),
+  listLifeSpaces: ({ status } = {}) => request(`/lifespaces${status ? `?status=${encodeURIComponent(status)}` : ""}`),
   createLifeSpace: (payload) => request("/lifespaces", { method: "POST", body: payload }),
   getLifeSpace: (id) => request(`/lifespaces/${id}`),
   updateLifeSpace: (id, payload) => request(`/lifespaces/${id}`, { method: "PATCH", body: payload }),
+  archiveLifeSpace: (id, payload = {}) => request(`/lifespaces/${id}/archive`, { method: "POST", body: payload }),
+  restoreLifeSpace: (id) => request(`/lifespaces/${id}/restore`, { method: "POST" }),
+  leaveLifeSpace: (id) => request(`/lifespaces/${id}/leave`, { method: "POST" }),
+  getLifeSpaceDeletionImpact: (id) => request(`/lifespaces/${id}/deletion-impact`),
+  deleteLifeSpace: (id, payload = {}) => request(`/lifespaces/${id}`, { method: "DELETE", body: payload }),
   getDashboard: (id) => request(`/lifespaces/${id}/dashboard`),
   getPublicReport: (slug, passcode) => request(withPasscode(`/public/lifespaces/${slug}/report`, passcode), { auth: false }),
 

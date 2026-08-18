@@ -15,5 +15,8 @@ export default defineConfig({
     globals: true,
     css: false,
     restoreMocks: true,
+    // Keep lifecycle modal state and fake timers isolated across files.
+    minWorkers: 1,
+    maxWorkers: 1,
   },
 });
