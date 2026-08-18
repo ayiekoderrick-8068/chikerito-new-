@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("../db");
 const { findPublicLifeSpace, checkPublicAccess } = require("../publicAccess");
+const { isCountable } = require("./contributions");
 
 const router = express.Router();
 
@@ -10,7 +11,8 @@ router.get("/public/lifespaces/:slug/report", (req, res) => {
   const access = checkPublicAccess(lifeSpace, req);
   if (!access.ok) return res.status(access.status).json(access.body);
 
-  const contributions = db.table("contributions").where((c) => c.life_space_id === lifeSpace.id);
+  const allContributions = db.table("contributions").where((c) => c.life_space_id === lifeSpace.id);
+  const contributions = allContributions.filter(isCountable);
   const categories = db.table("budget_categories").where((c) => c.life_space_id === lifeSpace.id);
 
   const raised = contributions.reduce((s, c) => s + c.amount, 0);
