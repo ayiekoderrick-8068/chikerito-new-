@@ -13,6 +13,7 @@ const links = [
   { to: "/app/analytics", label: "Analytics" },
   { to: "/app/team", label: "Team" },
   { to: "/app/report", label: "Progress Report" },
+  { to: "/app/audit-log", label: "Activity Log" },
   { to: "/app/settings", label: "Settings" },
 ];
 

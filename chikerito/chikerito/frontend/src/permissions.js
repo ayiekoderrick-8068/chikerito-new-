@@ -9,6 +9,7 @@ const CAPABILITIES = {
   "expense:manage": ["owner", "finance_manager"],
   "task:manage": ["owner", "event_planner"],
   "team:manage": ["owner"],
+  "audit:view": ["owner", "finance_manager"],
 };
 
 export function can(role, capability) {
