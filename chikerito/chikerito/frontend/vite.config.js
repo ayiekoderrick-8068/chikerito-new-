@@ -15,5 +15,9 @@ export default defineConfig({
     globals: true,
     css: false,
     restoreMocks: true,
+    // Keep timer, document-listener, and optimistic UI suites isolated from
+    // cross-file CPU contention without weakening assertions or timeouts.
+    minWorkers: 1,
+    maxWorkers: 1,
   },
 });

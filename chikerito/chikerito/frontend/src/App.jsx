@@ -19,6 +19,7 @@ import ExpenseTracker from "./pages/ExpenseTracker.jsx";
 import RecurringExpenses from "./pages/RecurringExpenses.jsx";
 import Contributions from "./pages/Contributions.jsx";
 import Analytics from "./pages/Analytics.jsx";
+import BudgetScenarios from "./pages/BudgetScenarios.jsx";
 import Team from "./pages/Team.jsx";
 import Settings from "./pages/Settings.jsx";
 import Report from "./pages/Report.jsx";
@@ -39,6 +40,7 @@ function AppShell() {
             <Route path="recurring-expenses" element={<RecurringExpenses />} />
             <Route path="contributions" element={<Contributions />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="budget-scenarios" element={<BudgetScenarios />} />
             <Route path="team" element={<Team />} />
             <Route path="report" element={<Report />} />
             <Route path="settings" element={<Settings />} />
