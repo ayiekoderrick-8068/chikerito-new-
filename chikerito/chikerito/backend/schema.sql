@@ -121,6 +121,22 @@ CREATE TABLE recurring_expenses (
   created_at        TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE recurring_expense_exceptions (
+  id                    UUID PRIMARY KEY,
+  recurring_expense_id  UUID REFERENCES recurring_expenses(id),
+  life_space_id         UUID REFERENCES life_spaces(id),
+  occurrence_date       DATE NOT NULL,
+  action                VARCHAR(20) NOT NULL, -- skip | override
+  override_date         DATE,
+  override_amount       NUMERIC(12,2),
+  override_category_id  UUID REFERENCES budget_categories(id),
+  override_vendor       VARCHAR(255),
+  status                VARCHAR(20) DEFAULT 'active', -- active | removed
+  created_at            TIMESTAMP DEFAULT now(),
+  updated_at            TIMESTAMP DEFAULT now(),
+  UNIQUE (recurring_expense_id, occurrence_date)
+);
+
 CREATE TABLE tasks (
   id            UUID PRIMARY KEY,
   life_space_id UUID REFERENCES life_spaces(id),

@@ -3,7 +3,7 @@ const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const { requireMember } = require("../middleware/authorize");
 const { sanitizeLifeSpace } = require("../serialize");
-const { runDueOccurrences, nextOccurrence } = require("../recurrence");
+const { runDueOccurrences, nextOccurrenceWithExceptions } = require("../recurrence");
 const { isCountable } = require("./contributions");
 
 const router = express.Router();
@@ -35,7 +35,7 @@ router.get("/lifespaces/:id/dashboard", requireAuth, requireMember("id"), (req, 
   // preview as an expense.
   const allUpcoming = recurringRules
     .map((rule) => {
-      const dueDate = nextOccurrence(rule);
+      const dueDate = nextOccurrenceWithExceptions(rule);
       return dueDate
         ? {
         recurringExpenseId: rule.id,
