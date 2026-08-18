@@ -22,6 +22,7 @@ const baseDashboardData = {
   categoryBreakdown: [{ id: "c1", name: "Venue", spent: 1500 }],
   monthlyTrend: [],
   financialHealth: { score: 92, rating: "Excellent", flags: [] },
+  upcomingRecurringExpenses: [],
   notifications: [],
   recentContributions: [],
 };
@@ -94,6 +95,42 @@ describe("Dashboard", () => {
     renderDashboard();
 
     expect(await screen.findByText(/no expenses recorded yet/i)).toBeInTheDocument();
+  });
+
+  it("shows a clear empty state when no recurring expenses are upcoming", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1" }, loading: false });
+    api.getDashboard.mockResolvedValue(baseDashboardData);
+    renderDashboard();
+
+    expect(await screen.findByText(/no upcoming recurring expenses scheduled/i)).toBeInTheDocument();
+  });
+
+  it("renders upcoming recurring expense details and projected-budget warnings", async () => {
+    useLifeSpace.mockReturnValue({ lifeSpaces: [], selectLifeSpace: vi.fn(), currentId: "ls1", current: { id: "ls1" }, loading: false });
+    api.getDashboard.mockResolvedValue({
+      ...baseDashboardData,
+      upcomingRecurringExpenses: [{
+        recurringExpenseId: "r1",
+        vendor: "Acme Hosting",
+        amount: 125,
+        categoryId: "c1",
+        category: "Venue",
+        dueDate: "2099-02-03",
+      }],
+      financialHealth: {
+        score: 82,
+        rating: "Good",
+        flags: ["Venue will likely exceed budget after upcoming expenses"],
+        projectedOver: [{ id: "c1", name: "Venue" }],
+      },
+    });
+    renderDashboard();
+
+    expect(await screen.findByText("Acme Hosting")).toBeInTheDocument();
+    expect(screen.getByText("$125")).toBeInTheDocument();
+    expect(screen.getAllByText("Venue").length).toBeGreaterThan(0);
+    expect(screen.getByText(/budget alert:/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/will likely exceed budget after upcoming expenses/i)).toHaveLength(2);
   });
 
   it("re-fetches when the selected life space changes", async () => {
