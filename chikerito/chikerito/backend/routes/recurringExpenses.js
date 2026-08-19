@@ -3,7 +3,7 @@ const { v4: uuid } = require("uuid");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const { requireMember, requireCapability, requireResourceCapability } = require("../middleware/authorize");
-const { FREQUENCIES, nextOccurrence, runDueOccurrences } = require("../recurrence");
+const { FREQUENCIES, nextOccurrenceWithExceptions, runDueOccurrences } = require("../recurrence");
 
 const router = express.Router();
 
@@ -37,7 +37,7 @@ function validateCreateOrUpdate(body, { partial = false } = {}) {
 }
 
 function serialize(recurring) {
-  return { ...recurring, nextOccurrence: nextOccurrence(recurring) };
+  return { ...recurring, nextOccurrence: nextOccurrenceWithExceptions(recurring) };
 }
 
 router.get("/lifespaces/:lifeSpaceId/recurring-expenses", requireAuth, requireMember("lifeSpaceId"), (req, res) => {

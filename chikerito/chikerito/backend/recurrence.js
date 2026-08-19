@@ -73,6 +73,83 @@ function dueDates(recurring, today = todayStr()) {
   return dates;
 }
 
+function activeException(recurringId, occurrenceDate) {
+  return db.table("recurring_expense_exceptions").where(
+    (exception) => exception.recurring_expense_id === recurringId
+      && exception.occurrence_date === occurrenceDate
+      && exception.status === "active"
+  )[0] || null;
+}
+
+function scheduledDates(recurring, through, { from = recurring.start_date, limit = 5000 } = {}) {
+  const dates = [];
+  let cursor = recurring.start_date;
+  let seen = 0;
+  while (cursor < from && seen < limit) {
+    cursor = addInterval(cursor, recurring.frequency);
+    seen += 1;
+  }
+  while (cursor <= through && seen < limit) {
+    if (recurring.end_date && cursor > recurring.end_date) break;
+    dates.push(cursor);
+    cursor = addInterval(cursor, recurring.frequency);
+    seen += 1;
+  }
+  return dates;
+}
+
+function materializedOccurrence(recurringId, occurrenceDate) {
+  return db.table("expenses").where((expense) =>
+    expense.recurring_expense_id === recurringId
+    && (expense.recurring_occurrence_date === occurrenceDate
+      || (!expense.recurring_occurrence_date && expense.payment_date === occurrenceDate))
+  )[0] || null;
+}
+
+function effectiveOccurrence(recurring, occurrenceDate) {
+  const exception = activeException(recurring.id, occurrenceDate);
+  if (exception?.action === "skip") {
+    return { occurrenceDate, state: "skipped", skipped: true, exception, effectiveDate: null };
+  }
+  return {
+    occurrenceDate,
+    state: exception ? "overridden" : "scheduled",
+    skipped: false,
+    exception,
+    effectiveDate: exception?.override_date || occurrenceDate,
+    vendor: exception?.override_vendor || recurring.vendor,
+    amount: exception?.override_amount ?? recurring.amount,
+    categoryId: exception?.override_category_id ?? recurring.category_id ?? null,
+  };
+}
+
+function previewOccurrences(recurring, { from = todayStr(), to, limit = 50 } = {}) {
+  const horizon = to || addDays(from, 180);
+  return scheduledDates(recurring, horizon, { from })
+    .slice(0, Math.max(1, Math.min(Number(limit) || 50, 200)))
+    .map((occurrenceDate) => {
+      const effective = effectiveOccurrence(recurring, occurrenceDate);
+      const materialized = materializedOccurrence(recurring.id, occurrenceDate);
+      return {
+        ...effective,
+        materialized: !!materialized,
+        expenseId: materialized?.id || null,
+      };
+    });
+}
+
+function nextOccurrenceWithExceptions(recurring, today = todayStr()) {
+  if (recurring.status !== "active") return null;
+  let horizon = recurring.start_date > today ? recurring.start_date : today;
+  for (let year = 0; year < 20; year += 1) horizon = addInterval(horizon, "yearly");
+  const candidates = scheduledDates(recurring, horizon, { limit: 5000 })
+    .map((date) => effectiveOccurrence(recurring, date))
+    .filter((occurrence) => !occurrence.skipped && !materializedOccurrence(recurring.id, occurrence.occurrenceDate))
+    .filter((occurrence) => occurrence.effectiveDate >= today)
+    .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.occurrenceDate.localeCompare(b.occurrenceDate));
+  return candidates[0]?.effectiveDate || null;
+}
+
 // Materializes every due occurrence for every active recurring expense in a
 // life space as a normal expenses row, then advances last_generated_date so
 // the same period is never generated twice.
@@ -80,27 +157,56 @@ function runDueOccurrences(lifeSpaceId) {
   const today = todayStr();
   const active = db.table("recurring_expenses").where((r) => r.life_space_id === lifeSpaceId && r.status === "active");
   active.forEach((recurring) => {
-    const due = dueDates(recurring, today);
-    if (!due.length) return;
-    due.forEach((date) => {
+    const ordinarilyDue = scheduledDates(recurring, today);
+    const movedEarlier = db.table("recurring_expense_exceptions").where((exception) =>
+      exception.recurring_expense_id === recurring.id
+      && exception.status === "active"
+      && exception.action === "override"
+      && exception.override_date
+      && exception.override_date <= today
+      && exception.occurrence_date > today
+    ).map((exception) => exception.occurrence_date);
+    const due = [...new Set([...ordinarilyDue, ...movedEarlier])].sort();
+    due.forEach((occurrenceDate) => {
+      if (materializedOccurrence(recurring.id, occurrenceDate)) return;
+      const effective = effectiveOccurrence(recurring, occurrenceDate);
+      if (effective.skipped || effective.effectiveDate > today) return;
       db.table("expenses").insert({
         id: uuid(),
         life_space_id: lifeSpaceId,
-        category_id: recurring.category_id || null,
-        vendor: recurring.vendor,
-        planned_amount: recurring.amount,
-        amount: recurring.amount,
+        category_id: effective.categoryId,
+        vendor: effective.vendor,
+        planned_amount: effective.amount,
+        amount: effective.amount,
         invoice_url: null,
         receipt_url: null,
-        payment_date: date,
+        payment_date: effective.effectiveDate,
         status: "paid",
-        notes: `Auto-generated from a recurring expense (${recurring.frequency}).`,
+        notes: effective.exception
+          ? `Auto-generated from a recurring expense (${recurring.frequency}) with an occurrence override.`
+          : `Auto-generated from a recurring expense (${recurring.frequency}).`,
         recurring_expense_id: recurring.id,
+        recurring_occurrence_date: occurrenceDate,
         created_at: new Date().toISOString(),
       });
     });
-    db.table("recurring_expenses").update(recurring.id, { last_generated_date: due[due.length - 1] });
+    if (ordinarilyDue.length) {
+      db.table("recurring_expenses").update(recurring.id, { last_generated_date: ordinarilyDue[ordinarilyDue.length - 1] });
+    }
   });
 }
 
-module.exports = { FREQUENCIES, todayStr, addInterval, nextOccurrence, dueDates, runDueOccurrences };
+module.exports = {
+  FREQUENCIES,
+  todayStr,
+  addInterval,
+  nextOccurrence,
+  dueDates,
+  scheduledDates,
+  activeException,
+  effectiveOccurrence,
+  materializedOccurrence,
+  previewOccurrences,
+  nextOccurrenceWithExceptions,
+  runDueOccurrences,
+};

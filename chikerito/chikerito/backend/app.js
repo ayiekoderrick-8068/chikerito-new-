@@ -16,6 +16,7 @@ const taskRoutes = require("./routes/tasks");
 const notificationRoutes = require("./routes/notifications");
 const invitationRoutes = require("./routes/invitations");
 const recurringExpenseRoutes = require("./routes/recurringExpenses");
+const recurringExceptionRoutes = require("./routes/recurringExceptions").router;
 const budgetScenarioRoutes = require("./routes/budgetScenarios");
 const analyticsRoutes = require("./routes/analytics");
 const auditRoutes = require("./routes/auditLogs");
@@ -41,6 +42,7 @@ function createApp() {
   app.use("/api", notificationRoutes); // /api/lifespaces/:id/notifications, /api/notifications/:id
   app.use("/api", invitationRoutes);   // /api/lifespaces/:id/invitations, /api/invitations/:id/accept|decline, /api/invitations/pending
   app.use("/api", recurringExpenseRoutes); // /api/lifespaces/:id/recurring-expenses, /api/recurring-expenses/:id
+  app.use("/api", recurringExceptionRoutes); // /api/recurring-expenses/:id/occurrences|exceptions
   app.use("/api", budgetScenarioRoutes); // /api/lifespaces/:id/budget-scenarios, /api/budget-scenarios/:id
   app.use("/api", analyticsRoutes); // /api/lifespaces/:id/analytics
   app.use("/api", auditRoutes);       // /api/lifespaces/:id/audit-logs

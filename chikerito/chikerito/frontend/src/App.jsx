@@ -17,6 +17,7 @@ import FinanceHub from "./pages/FinanceHub.jsx";
 import BudgetSpreadsheet from "./pages/BudgetSpreadsheet.jsx";
 import ExpenseTracker from "./pages/ExpenseTracker.jsx";
 import RecurringExpenses from "./pages/RecurringExpenses.jsx";
+import RecurringExceptions from "./pages/RecurringExceptions.jsx";
 import Contributions from "./pages/Contributions.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import BudgetScenarios from "./pages/BudgetScenarios.jsx";
@@ -39,6 +40,7 @@ function AppShell() {
             <Route path="budget-spreadsheet" element={<BudgetSpreadsheet />} />
             <Route path="expenses" element={<ExpenseTracker />} />
             <Route path="recurring-expenses" element={<RecurringExpenses />} />
+            <Route path="recurring-exceptions" element={<RecurringExceptions />} />
             <Route path="contributions" element={<Contributions />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="budget-scenarios" element={<BudgetScenarios />} />
