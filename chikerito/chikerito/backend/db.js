@@ -26,6 +26,8 @@ const EMPTY = {
   budget_scenario_adjustments: [],
   tasks: [],
   notifications: [],
+  notification_user_states: [],
+  audit_logs: [],
 };
 
 const TABLES = Object.keys(EMPTY);

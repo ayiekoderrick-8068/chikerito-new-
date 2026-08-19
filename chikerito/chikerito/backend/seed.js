@@ -17,6 +17,7 @@ async function seed() {
     budget_scenario_adjustments: [],
     tasks: [],
     notifications: [],
+    notification_user_states: [],
   });
 
   const users = db.table("users");

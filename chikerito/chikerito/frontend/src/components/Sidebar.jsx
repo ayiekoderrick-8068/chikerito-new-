@@ -14,6 +14,7 @@ const links = [
   { to: "/app/budget-scenarios", label: "Budget Scenarios" },
   { to: "/app/team", label: "Team" },
   { to: "/app/report", label: "Progress Report" },
+  { to: "/app/audit-log", label: "Activity Log" },
   { to: "/app/settings", label: "Settings" },
 ];
 

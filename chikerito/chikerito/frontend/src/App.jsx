@@ -23,6 +23,7 @@ import BudgetScenarios from "./pages/BudgetScenarios.jsx";
 import Team from "./pages/Team.jsx";
 import Settings from "./pages/Settings.jsx";
 import Report from "./pages/Report.jsx";
+import AuditLog from "./pages/AuditLog.jsx";
 
 function AppShell() {
   return (
@@ -43,6 +44,7 @@ function AppShell() {
             <Route path="budget-scenarios" element={<BudgetScenarios />} />
             <Route path="team" element={<Team />} />
             <Route path="report" element={<Report />} />
+            <Route path="audit-log" element={<AuditLog />} />
             <Route path="settings" element={<Settings />} />
           </Routes>
         </div>

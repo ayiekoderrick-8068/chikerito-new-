@@ -24,6 +24,7 @@ const CAPABILITIES = {
   "scenario:manage": ["owner", "finance_manager"],
   "task:manage": ["owner", "event_planner"],
   "team:manage": ["owner"],
+  "audit:view": ["owner", "finance_manager"],
 };
 
 // The true owner is tracked by life_spaces.owner_id (set once at creation);
