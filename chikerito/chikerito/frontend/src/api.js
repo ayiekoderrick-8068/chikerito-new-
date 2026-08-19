@@ -119,10 +119,14 @@ export const api = {
   updateTask: (id, payload) => request(`/tasks/${id}`, { method: "PATCH", body: payload }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: "DELETE" }),
 
-  listNotifications: (lifeSpaceId, { unreadOnly, before, limit } = {}) => {
+  listNotifications: (lifeSpaceId, { unreadOnly, filter, type, q, before, cursor, limit } = {}) => {
     const params = new URLSearchParams();
     if (unreadOnly) params.set("unreadOnly", "true");
+    if (filter) params.set("filter", filter);
+    if (type) params.set("type", type);
+    if (q) params.set("q", q);
     if (before) params.set("before", before);
+    if (cursor) params.set("cursor", cursor);
     if (limit) params.set("limit", limit);
     const qs = params.toString();
     return request(`/lifespaces/${lifeSpaceId}/notifications${qs ? `?${qs}` : ""}`);
@@ -131,6 +135,7 @@ export const api = {
   markAllNotificationsRead: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/notifications/mark-all-read`, { method: "POST" }),
   setNotificationRead: (id, read) => request(`/notifications/${id}`, { method: "PATCH", body: { read } }),
   deleteNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
+  restoreNotification: (id) => request(`/notifications/${id}/restore`, { method: "POST" }),
 
   listAuditLogs: (lifeSpaceId, filters = {}) => {
     const params = new URLSearchParams();

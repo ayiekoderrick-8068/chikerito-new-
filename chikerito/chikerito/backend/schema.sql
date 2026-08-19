@@ -141,6 +141,20 @@ CREATE TABLE notifications (
   created_at    TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE notification_user_states (
+  id              UUID PRIMARY KEY,
+  notification_id UUID NOT NULL REFERENCES notifications(id),
+  life_space_id   UUID NOT NULL REFERENCES life_spaces(id),
+  user_id         UUID NOT NULL REFERENCES users(id),
+  read            BOOLEAN DEFAULT false,
+  dismissed       BOOLEAN DEFAULT false,
+  read_at         TIMESTAMPTZ,
+  dismissed_at    TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(notification_id, user_id)
+);
+
 CREATE TABLE audit_logs (
   id            UUID PRIMARY KEY,
   life_space_id UUID REFERENCES life_spaces(id),

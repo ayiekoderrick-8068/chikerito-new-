@@ -24,6 +24,7 @@ const EMPTY = {
   recurring_expenses: [],
   tasks: [],
   notifications: [],
+  notification_user_states: [],
   audit_logs: [],
 };
 
