@@ -94,6 +94,13 @@ export const api = {
   resumeRecurringExpense: (id) => request(`/recurring-expenses/${id}/resume`, { method: "POST" }),
   deleteRecurringExpense: (id) => request(`/recurring-expenses/${id}`, { method: "DELETE" }),
 
+  listBudgetScenarios: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/budget-scenarios`),
+  getBudgetScenario: (id) => request(`/budget-scenarios/${id}`),
+  previewBudgetScenario: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/budget-scenarios/preview`, { method: "POST", body: payload }),
+  createBudgetScenario: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/budget-scenarios`, { method: "POST", body: payload }),
+  updateBudgetScenario: (id, payload) => request(`/budget-scenarios/${id}`, { method: "PATCH", body: payload }),
+  deleteBudgetScenario: (id) => request(`/budget-scenarios/${id}`, { method: "DELETE" }),
+
   listContributions: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/contributions`),
   createContribution: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/contributions`, { method: "POST", body: payload }),
   updateContribution: (id, payload) => request(`/contributions/${id}`, { method: "PATCH", body: payload }),

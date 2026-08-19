@@ -7,6 +7,7 @@ const CAPABILITIES = {
   "lifespace:delete": ["owner"],
   "category:manage": ["owner", "finance_manager"],
   "expense:manage": ["owner", "finance_manager"],
+  "scenario:manage": ["owner", "finance_manager"],
   "task:manage": ["owner", "event_planner"],
   "team:manage": ["owner"],
   "audit:view": ["owner", "finance_manager"],

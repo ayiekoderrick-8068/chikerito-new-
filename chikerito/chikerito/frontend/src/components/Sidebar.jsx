@@ -11,6 +11,7 @@ const links = [
   { to: "/app/recurring-expenses", label: "Recurring Expenses" },
   { to: "/app/contributions", label: "Contributions" },
   { to: "/app/analytics", label: "Analytics" },
+  { to: "/app/budget-scenarios", label: "Budget Scenarios" },
   { to: "/app/team", label: "Team" },
   { to: "/app/report", label: "Progress Report" },
   { to: "/app/audit-log", label: "Activity Log" },

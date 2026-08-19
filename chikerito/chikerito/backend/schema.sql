@@ -121,6 +121,29 @@ CREATE TABLE recurring_expenses (
   created_at        TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE budget_scenarios (
+  id            UUID PRIMARY KEY,
+  life_space_id UUID REFERENCES life_spaces(id),
+  name          VARCHAR(120) NOT NULL,
+  description   TEXT,
+  horizon_date  DATE NOT NULL,
+  created_by    UUID REFERENCES users(id),
+  created_at    TIMESTAMP DEFAULT now(),
+  updated_at    TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE budget_scenario_adjustments (
+  id                       UUID PRIMARY KEY,
+  scenario_id              UUID REFERENCES budget_scenarios(id),
+  life_space_id            UUID REFERENCES life_spaces(id),
+  category_id              UUID REFERENCES budget_categories(id),
+  budget_amount            NUMERIC(12,2),
+  projected_expenses       NUMERIC(12,2) DEFAULT 0,
+  projected_contributions  NUMERIC(12,2) DEFAULT 0,
+  note                     VARCHAR(255),
+  created_at               TIMESTAMP DEFAULT now()
+);
+
 CREATE TABLE tasks (
   id            UUID PRIMARY KEY,
   life_space_id UUID REFERENCES life_spaces(id),
