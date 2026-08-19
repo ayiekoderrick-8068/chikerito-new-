@@ -14,8 +14,11 @@ async function seed() {
     expenses: [],
     recurring_expenses: [],
     recurring_expense_exceptions: [],
+    budget_scenarios: [],
+    budget_scenario_adjustments: [],
     tasks: [],
     notifications: [],
+    notification_user_states: [],
   });
 
   const users = db.table("users");

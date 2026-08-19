@@ -79,6 +79,12 @@ function serialize(exception) {
   };
 }
 
+function rejectMaterialized(res, recurringExpenseId, occurrenceDate) {
+  if (!materializedOccurrence(recurringExpenseId, occurrenceDate)) return false;
+  res.status(409).json({ error: "Materialized occurrences can no longer be changed" });
+  return true;
+}
+
 function rowValues(rule, input) {
   return {
     occurrence_date: input.occurrenceDate,
@@ -136,6 +142,7 @@ router.post(
   (req, res) => {
     const errors = validate(req.resource, req.body);
     if (errors.length) return res.status(400).json({ error: errors[0], errors });
+    if (rejectMaterialized(res, req.resource.id, req.body.occurrenceDate)) return;
     const duplicate = db.table("recurring_expense_exceptions").where((exception) =>
       exception.recurring_expense_id === req.resource.id && exception.occurrence_date === req.body.occurrenceDate
     )[0];
@@ -158,6 +165,7 @@ router.patch(
   requireAuth,
   requireResourceCapability("recurring_expense_exceptions", "expense:manage"),
   (req, res) => {
+    if (rejectMaterialized(res, req.resource.recurring_expense_id, req.resource.occurrence_date)) return;
     const rule = db.table("recurring_expenses").find(req.resource.recurring_expense_id);
     if (!rule) return res.status(404).json({ error: "Recurring expense not found" });
     const merged = {
@@ -183,6 +191,7 @@ router.delete(
   requireAuth,
   requireResourceCapability("recurring_expense_exceptions", "expense:manage"),
   (req, res) => {
+    if (rejectMaterialized(res, req.resource.recurring_expense_id, req.resource.occurrence_date)) return;
     if (req.resource.status === "removed") return res.status(409).json({ error: "Exception is already removed" });
     db.table("recurring_expense_exceptions").update(req.resource.id, { status: "removed", updated_at: new Date().toISOString() });
     res.status(204).end();
@@ -194,10 +203,11 @@ router.post(
   requireAuth,
   requireResourceCapability("recurring_expense_exceptions", "expense:manage"),
   (req, res) => {
+    if (rejectMaterialized(res, req.resource.recurring_expense_id, req.resource.occurrence_date)) return;
     if (req.resource.status !== "removed") return res.status(409).json({ error: "Only a removed exception can be restored" });
     const updated = db.table("recurring_expense_exceptions").update(req.resource.id, { status: "active", updated_at: new Date().toISOString() });
     res.json({ exception: serialize(updated) });
   }
 );
 
-module.exports = { router, validDate, isScheduled, validate, serialize };
+module.exports = { router, validDate, isScheduled, validate, serialize, rejectMaterialized };

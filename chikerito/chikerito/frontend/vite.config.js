@@ -15,7 +15,9 @@ export default defineConfig({
     globals: true,
     css: false,
     restoreMocks: true,
-    // A single worker avoids cross-file timer and jsdom contention in repeat runs.
+    // The UI suites exercise timers, document listeners, and optimistic async
+    // state heavily. A single worker keeps those process-wide resources
+    // isolated and avoids CPU-contention timeouts without relaxing assertions.
     minWorkers: 1,
     maxWorkers: 1,
   },

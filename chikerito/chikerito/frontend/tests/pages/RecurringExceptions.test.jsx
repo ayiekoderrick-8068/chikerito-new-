@@ -280,6 +280,9 @@ describe("RecurringExceptions page", () => {
     const row = await loadedRow();
     expect(within(row).getByText("materialized")).toBeInTheDocument();
     expect(screen.getByText(/removed · materialized/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Final")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
   });
 
   it("hides all mutation controls from a volunteer", async () => {

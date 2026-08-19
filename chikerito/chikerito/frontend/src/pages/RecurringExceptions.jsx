@@ -212,7 +212,7 @@ export default function RecurringExceptions() {
                   <thead><tr><th scope="col">Scheduled</th><th scope="col">Effective date</th><th scope="col">Vendor</th><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">State</th>{canManage && <th scope="col">Actions</th>}</tr></thead>
                   <tbody>{occurrences.map((occurrence) => <tr key={occurrence.occurrenceDate}>
                     <td>{occurrence.occurrenceDate}</td><td>{occurrence.effectiveDate || "—"}</td><td>{occurrence.vendor || selectedRule.vendor}</td><td>{categoryNames.get(occurrence.categoryId) || "Uncategorized"}</td><td>{occurrence.skipped ? "—" : Number(occurrence.amount).toLocaleString()}</td><td><span className={`status-badge ${occurrence.state}`}>{occurrence.materialized ? "materialized" : occurrence.state}</span></td>
-                    {canManage && <td><div className="row-actions">{occurrence.exception ? <button className="btn btn-ghost btn-sm" onClick={() => setEditor(editorForm(occurrence, occurrence.exception))}>Edit</button> : <><button className="btn btn-ghost btn-sm" onClick={() => skipOccurrence(occurrence)}>Skip</button><button className="btn btn-ghost btn-sm" onClick={() => setEditor(editorForm(occurrence))}>Override</button></>}</div></td>}
+                    {canManage && <td><div className="row-actions">{occurrence.materialized ? <span className="muted">Final</span> : occurrence.exception ? <button className="btn btn-ghost btn-sm" onClick={() => setEditor(editorForm(occurrence, occurrence.exception))}>Edit</button> : <><button className="btn btn-ghost btn-sm" onClick={() => skipOccurrence(occurrence)}>Skip</button><button className="btn btn-ghost btn-sm" onClick={() => setEditor(editorForm(occurrence))}>Override</button></>}</div></td>}
                   </tr>)}</tbody>
                 </table></div>}
               </section>
@@ -220,7 +220,7 @@ export default function RecurringExceptions() {
                 <h3>Exception history</h3>
                 {exceptions.length === 0 ? <div className="empty-state">No exceptions for this rule.</div> : <ul>{exceptions.map((exception) => <li key={exception.id}>
                   <div><strong>{exception.occurrenceDate}</strong><span>{exception.action}{exception.overrideDate ? ` → ${exception.overrideDate}` : ""}</span><small>{exception.status}{exception.materialized ? " · materialized" : ""}</small></div>
-                  {canManage && <div className="row-actions">{exception.status === "removed" ? <button className="btn btn-ghost btn-sm" onClick={() => restoreException(exception)}>Restore</button> : <><button className="btn btn-ghost btn-sm" onClick={() => setEditor(editorForm(null, exception))}>Edit</button><button className="btn btn-ghost btn-sm danger-text" onClick={() => removeException(exception)}>Remove</button></>}</div>}
+                  {canManage && <div className="row-actions">{exception.materialized ? <span className="muted">Final</span> : exception.status === "removed" ? <button className="btn btn-ghost btn-sm" onClick={() => restoreException(exception)}>Restore</button> : <><button className="btn btn-ghost btn-sm" onClick={() => setEditor(editorForm(null, exception))}>Edit</button><button className="btn btn-ghost btn-sm danger-text" onClick={() => removeException(exception)}>Remove</button></>}</div>}
                 </li>)}</ul>}
               </section>
             </div>}

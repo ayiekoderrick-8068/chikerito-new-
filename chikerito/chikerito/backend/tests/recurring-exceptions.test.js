@@ -258,4 +258,24 @@ describe("recurring exception API policy", () => {
     expect((await api().get("/api/recurring-expenses/missing/occurrences").set(owner.headers)).status).toBe(404);
     expect((await api().post("/api/recurring-expense-exceptions/missing/restore").set(owner.headers)).status).toBe(404);
   });
+
+  it("rejects exception mutations after the occurrence is materialized", async () => {
+    const owner = await registerUser();
+    const space = await createLifeSpace(owner.token);
+    const rule = ruleFixture(space.id);
+    const exception = exceptionFixture(rule, "2026-06-08", { id: "final-exception" });
+    db.table("expenses").insert({
+      id: "generated-final", life_space_id: space.id, recurring_expense_id: rule.id,
+      recurring_occurrence_date: "2026-06-08", payment_date: "2026-06-08", amount: 100,
+    });
+
+    const create = await api().post(`/api/recurring-expenses/${rule.id}/exceptions`).set(owner.headers)
+      .send({ occurrenceDate: "2026-06-08", action: "skip" });
+    const update = await api().patch(`/api/recurring-expense-exceptions/${exception.id}`).set(owner.headers)
+      .send({ action: "override", overrideAmount: 90 });
+    const remove = await api().delete(`/api/recurring-expense-exceptions/${exception.id}`).set(owner.headers);
+
+    expect([create.status, update.status, remove.status]).toEqual([409, 409, 409]);
+    expect(update.body.error).toMatch(/materialized/i);
+  });
 });
