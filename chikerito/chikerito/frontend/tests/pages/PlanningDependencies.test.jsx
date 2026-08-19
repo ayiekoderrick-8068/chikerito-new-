@@ -65,8 +65,7 @@ describe("Planning dependency and subtask presentation", () => {
     api.listTasks.mockResolvedValue({ tasks });
     api.updateTask.mockResolvedValue({ task: tasks[0] });
     api.createTask.mockResolvedValue({ task: { id: "created" } });
-    api.addTaskDependency.mockResolvedValue({});
-    api.removeTaskDependency.mockResolvedValue({});
+    api.replaceTaskDependencies.mockResolvedValue({});
     api.deleteTask.mockResolvedValue({});
   });
 
@@ -157,7 +156,7 @@ describe("Planning subtask creation", () => {
     lifeSpace();
     api.listTasks.mockResolvedValue({ tasks });
     api.createTask.mockResolvedValue({ task: { id: "new-child" } });
-    api.addTaskDependency.mockResolvedValue({});
+    api.replaceTaskDependencies.mockResolvedValue({});
   });
 
   it("opens the add form with parent and category inherited", async () => {
@@ -189,7 +188,7 @@ describe("Planning subtask creation", () => {
     await userEvent.type(within(modal).getByPlaceholderText(/book venue/i), "Send invitations");
     await userEvent.click(within(modal).getByLabelText("Choose menu"));
     await userEvent.click(within(modal).getByRole("button", { name: "Add Task" }));
-    await waitFor(() => expect(api.addTaskDependency).toHaveBeenCalledWith("new-child", "prerequisite"));
+    await waitFor(() => expect(api.replaceTaskDependencies).toHaveBeenCalledWith("new-child", ["prerequisite"]));
   });
 
   it("does not write dependency edges when none are selected", async () => {
@@ -200,7 +199,7 @@ describe("Planning subtask creation", () => {
     await userEvent.type(within(modal).getByPlaceholderText(/book venue/i), "Simple task");
     await userEvent.click(within(modal).getByRole("button", { name: "Add Task" }));
     await waitFor(() => expect(api.createTask).toHaveBeenCalled());
-    expect(api.addTaskDependency).not.toHaveBeenCalled();
+    expect(api.replaceTaskDependencies).not.toHaveBeenCalled();
   });
 
   it("keeps the modal open and reports a create failure", async () => {
@@ -222,8 +221,7 @@ describe("Planning dependency editor", () => {
     lifeSpace();
     api.listTasks.mockResolvedValue({ tasks });
     api.updateTask.mockResolvedValue({ task: tasks[2] });
-    api.addTaskDependency.mockResolvedValue({});
-    api.removeTaskDependency.mockResolvedValue({});
+    api.replaceTaskDependencies.mockResolvedValue({});
   });
 
   it("prefills parent and existing dependency selections", async () => {
@@ -249,19 +247,19 @@ describe("Planning dependency editor", () => {
     const modal = await openEdit("Print menu");
     await userEvent.click(within(modal).getByLabelText("Choose menu"));
     await userEvent.click(within(modal).getByRole("button", { name: "Save Changes" }));
-    await waitFor(() => expect(api.removeTaskDependency).toHaveBeenCalledWith("dependent", "prerequisite"));
+    await waitFor(() => expect(api.replaceTaskDependencies).toHaveBeenCalledWith("dependent", []));
   });
 
   it("adds a newly checked dependency", async () => {
     const modal = await openEdit("Print menu");
     await userEvent.click(within(modal).getByLabelText("Plan ceremony"));
     await userEvent.click(within(modal).getByRole("button", { name: "Save Changes" }));
-    await waitFor(() => expect(api.addTaskDependency).toHaveBeenCalledWith("dependent", "root"));
+    await waitFor(() => expect(api.replaceTaskDependencies).toHaveBeenCalledWith("dependent", ["prerequisite", "root"]));
   });
 
   it("waits for relationship updates before closing and reloading", async () => {
     let resolveEdge;
-    api.addTaskDependency.mockReturnValue(new Promise((resolve) => { resolveEdge = resolve; }));
+    api.replaceTaskDependencies.mockReturnValue(new Promise((resolve) => { resolveEdge = resolve; }));
     const modal = await openEdit("Print menu");
     await userEvent.click(within(modal).getByLabelText("Plan ceremony"));
     await userEvent.click(within(modal).getByRole("button", { name: "Save Changes" }));
@@ -272,7 +270,7 @@ describe("Planning dependency editor", () => {
   });
 
   it("shows a dependency-cycle API error inside the editor", async () => {
-    api.addTaskDependency.mockRejectedValue(new Error("Dependency would create a cycle"));
+    api.replaceTaskDependencies.mockRejectedValue(new Error("Dependency would create a cycle"));
     const modal = await openEdit("Print menu");
     await userEvent.click(within(modal).getByLabelText("Plan ceremony"));
     await userEvent.click(within(modal).getByRole("button", { name: "Save Changes" }));

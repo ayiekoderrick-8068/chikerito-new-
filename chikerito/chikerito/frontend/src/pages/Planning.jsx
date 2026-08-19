@@ -153,14 +153,10 @@ export default function Planning() {
   }
 
   async function syncDependencies(taskId, existingIds, wantedIds) {
-    const existing = new Set(existingIds || []);
-    const wanted = new Set(wantedIds || []);
-    for (const dependencyId of [...existing].filter((id) => !wanted.has(id)).sort()) {
-      await api.removeTaskDependency(taskId, dependencyId);
-    }
-    for (const dependencyId of [...wanted].filter((id) => !existing.has(id)).sort()) {
-      await api.addTaskDependency(taskId, dependencyId);
-    }
+    const existing = [...new Set(existingIds || [])].sort();
+    const wanted = [...new Set(wantedIds || [])].sort();
+    if (existing.length === wanted.length && existing.every((id, index) => id === wanted[index])) return;
+    await api.replaceTaskDependencies(taskId, wanted);
   }
 
   async function handleEditSubmit(e) {

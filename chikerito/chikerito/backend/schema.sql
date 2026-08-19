@@ -121,6 +121,45 @@ CREATE TABLE recurring_expenses (
   created_at        TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE recurring_expense_exceptions (
+  id                    UUID PRIMARY KEY,
+  recurring_expense_id  UUID REFERENCES recurring_expenses(id),
+  life_space_id         UUID REFERENCES life_spaces(id),
+  occurrence_date       DATE NOT NULL,
+  action                VARCHAR(20) NOT NULL, -- skip | override
+  override_date         DATE,
+  override_amount       NUMERIC(12,2),
+  override_category_id  UUID REFERENCES budget_categories(id),
+  override_vendor       VARCHAR(255),
+  status                VARCHAR(20) DEFAULT 'active', -- active | removed
+  created_at            TIMESTAMP DEFAULT now(),
+  updated_at            TIMESTAMP DEFAULT now(),
+  UNIQUE (recurring_expense_id, occurrence_date)
+);
+
+CREATE TABLE budget_scenarios (
+  id            UUID PRIMARY KEY,
+  life_space_id UUID REFERENCES life_spaces(id),
+  name          VARCHAR(120) NOT NULL,
+  description   TEXT,
+  horizon_date  DATE NOT NULL,
+  created_by    UUID REFERENCES users(id),
+  created_at    TIMESTAMP DEFAULT now(),
+  updated_at    TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE budget_scenario_adjustments (
+  id                       UUID PRIMARY KEY,
+  scenario_id              UUID REFERENCES budget_scenarios(id),
+  life_space_id            UUID REFERENCES life_spaces(id),
+  category_id              UUID REFERENCES budget_categories(id),
+  budget_amount            NUMERIC(12,2),
+  projected_expenses       NUMERIC(12,2) DEFAULT 0,
+  projected_contributions  NUMERIC(12,2) DEFAULT 0,
+  note                     VARCHAR(255),
+  created_at               TIMESTAMP DEFAULT now()
+);
+
 CREATE TABLE tasks (
   id            UUID PRIMARY KEY,
   life_space_id UUID REFERENCES life_spaces(id),
@@ -149,4 +188,30 @@ CREATE TABLE notifications (
   message       TEXT NOT NULL,
   read          BOOLEAN DEFAULT false,
   created_at    TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE notification_user_states (
+  id              UUID PRIMARY KEY,
+  notification_id UUID NOT NULL REFERENCES notifications(id),
+  life_space_id   UUID NOT NULL REFERENCES life_spaces(id),
+  user_id         UUID NOT NULL REFERENCES users(id),
+  read            BOOLEAN DEFAULT false,
+  dismissed       BOOLEAN DEFAULT false,
+  read_at         TIMESTAMPTZ,
+  dismissed_at    TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(notification_id, user_id)
+);
+
+CREATE TABLE audit_logs (
+  id            UUID PRIMARY KEY,
+  life_space_id UUID REFERENCES life_spaces(id),
+  actor_id      UUID REFERENCES users(id) NULL,
+  actor_name    VARCHAR(220) NOT NULL,
+  action        VARCHAR(80) NOT NULL,
+  resource_type VARCHAR(50) NOT NULL,
+  resource_id   UUID,
+  metadata      JSON NOT NULL,
+  occurred_at   TIMESTAMP DEFAULT now()
 );
