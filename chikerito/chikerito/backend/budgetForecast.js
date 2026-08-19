@@ -1,5 +1,6 @@
 const db = require("./db");
 const { addInterval } = require("./recurrence");
+const { baseAmount } = require("./currency");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -67,7 +68,7 @@ function validateScenarioInput(lifeSpaceId, input, { partial = false, asOf = tod
   return errors;
 }
 
-function futureOccurrences(rule, asOf, horizonDate) {
+function futureOccurrences(rule, asOf, horizonDate, baseCurrency = "USD") {
   if (rule.status !== "active" || horizonDate <= asOf) return [];
   let cursor = rule.last_generated_date
     ? addInterval(rule.last_generated_date, rule.frequency)
@@ -84,7 +85,7 @@ function futureOccurrences(rule, asOf, horizonDate) {
       recurringExpenseId: rule.id,
       categoryId: rule.category_id || null,
       vendor: rule.vendor,
-      amount: money(rule.amount),
+      amount: money(baseAmount(rule, baseCurrency)),
       dueDate: cursor,
     });
     cursor = addInterval(cursor, rule.frequency);
@@ -118,13 +119,15 @@ function buildForecast(lifeSpaceId, draft, { asOf = todayStr() } = {}) {
   const allocationByCategory = new Map(allocations.map((allocation) => [allocation.categoryId, allocation]));
 
   const recurringOccurrences = recurringRules
-    .flatMap((rule) => futureOccurrences(rule, asOf, draft.horizonDate))
+    .flatMap((rule) => futureOccurrences(rule, asOf, draft.horizonDate, lifeSpace.currency))
     .sort((a, b) => compareText(a.dueDate, b.dueDate) || compareText(a.vendor, b.vendor) || compareText(a.recurringExpenseId, b.recurringExpenseId));
 
   const categoryForecasts = categories.map((category) => {
     const allocation = allocationByCategory.get(category.id) || normalizedAllocation({ categoryId: category.id });
-    const currentSpent = sum(expenses.filter((expense) => expense.category_id === category.id));
-    const currentRaised = sum(contributions.filter((contribution) => contribution.category_id === category.id));
+    const currentSpent = money(expenses.filter((expense) => expense.category_id === category.id)
+      .reduce((total, row) => total + baseAmount(row, lifeSpace.currency), 0));
+    const currentRaised = money(contributions.filter((contribution) => contribution.category_id === category.id)
+      .reduce((total, row) => total + baseAmount(row, lifeSpace.currency), 0));
     const projectedRecurring = sum(recurringOccurrences.filter((occurrence) => occurrence.categoryId === category.id));
     const scenarioBudget = allocation.budgetAmount === null ? money(category.budget_amount) : money(allocation.budgetAmount);
     const forecastSpent = money(currentSpent + projectedRecurring + allocation.projectedExpenses);
@@ -152,8 +155,8 @@ function buildForecast(lifeSpaceId, draft, { asOf = todayStr() } = {}) {
 
   const currentBudget = sum(categories, "budget_amount");
   const scenarioBudget = sum(categoryForecasts, "scenarioBudget");
-  const currentSpent = sum(expenses);
-  const currentRaised = sum(contributions);
+  const currentSpent = money(expenses.reduce((total, row) => total + baseAmount(row, lifeSpace.currency), 0));
+  const currentRaised = money(contributions.reduce((total, row) => total + baseAmount(row, lifeSpace.currency), 0));
   const projectedRecurring = sum(recurringOccurrences);
   const projectedExpenses = sum(allocations, "projectedExpenses");
   const projectedContributions = sum(allocations, "projectedContributions");

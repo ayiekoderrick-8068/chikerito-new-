@@ -16,6 +16,7 @@ const taskRoutes = require("./routes/tasks");
 const notificationRoutes = require("./routes/notifications");
 const invitationRoutes = require("./routes/invitations");
 const recurringExpenseRoutes = require("./routes/recurringExpenses");
+const currencyRoutes = require("./routes/currencies");
 const recurringExceptionRoutes = require("./routes/recurringExceptions").router;
 const budgetScenarioRoutes = require("./routes/budgetScenarios");
 const analyticsRoutes = require("./routes/analytics");
@@ -30,6 +31,7 @@ function createApp() {
   app.use(auditMutations);
 
   app.get("/api/health", (req, res) => res.json({ status: "ok", service: "chikerito-api" }));
+  app.use("/api", currencyRoutes);
 
   app.use("/api/auth", authRoutes);
   app.use("/api/lifespaces", lifeSpaceRoutes);

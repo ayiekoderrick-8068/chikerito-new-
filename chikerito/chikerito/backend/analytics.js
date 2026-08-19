@@ -1,4 +1,5 @@
 const { isCountable } = require("./routes/contributions");
+const { baseAmount } = require("./currency");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -50,22 +51,22 @@ function previousRange(from, to) {
   return { from: addDays(from, -length), to: addDays(from, -1) };
 }
 
-function groupMonthly(expenses) {
+function groupMonthly(expenses, currency) {
   const groups = new Map();
   expenses.forEach((expense) => {
     const month = dateOf(expense).slice(0, 7);
-    groups.set(month, (groups.get(month) || 0) + expense.amount);
+    groups.set(month, (groups.get(month) || 0) + baseAmount(expense, currency));
   });
   return [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, total]) => ({ month, total: round(total) }));
 }
 
-function groupDaily(expenses) {
+function groupDaily(expenses, currency) {
   const groups = new Map();
   expenses.forEach((expense) => {
     const date = dateOf(expense);
-    groups.set(date, (groups.get(date) || 0) + expense.amount);
+    groups.set(date, (groups.get(date) || 0) + baseAmount(expense, currency));
   });
   return [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -80,11 +81,11 @@ function groupStatuses(expenses) {
     .map(([status, count]) => ({ status, count }));
 }
 
-function groupVendors(expenses) {
+function groupVendors(expenses, currency) {
   const groups = new Map();
   expenses.forEach((expense) => {
     const current = groups.get(expense.vendor) || { vendor: expense.vendor, total: 0, count: 0 };
-    current.total += expense.amount;
+    current.total += baseAmount(expense, currency);
     current.count += 1;
     groups.set(expense.vendor, current);
   });
@@ -94,11 +95,11 @@ function groupVendors(expenses) {
     .slice(0, 5);
 }
 
-function calculatePeriod(expenses, contributions) {
-  const spent = round(sum(expenses));
-  const raised = round(sum(contributions));
-  const largestExpense = expenses.reduce((largest, row) => Math.max(largest, Number(row.amount) || 0), 0);
-  const largestContribution = contributions.reduce((largest, row) => Math.max(largest, Number(row.amount) || 0), 0);
+function calculatePeriod(expenses, contributions, currency = "USD") {
+  const spent = round(expenses.reduce((total, row) => total + baseAmount(row, currency), 0));
+  const raised = round(contributions.reduce((total, row) => total + baseAmount(row, currency), 0));
+  const largestExpense = expenses.reduce((largest, row) => Math.max(largest, baseAmount(row, currency)), 0);
+  const largestContribution = contributions.reduce((largest, row) => Math.max(largest, baseAmount(row, currency)), 0);
   return {
     spent,
     raised,
@@ -150,19 +151,19 @@ function buildAnalytics({ lifeSpace, categories, expenses, contributions, filter
     && inRange(contributionDate(row), filters.from, filters.to)
   );
   const selectedCategories = categoryId ? categories.filter((row) => row.id === categoryId) : categories;
-  const current = calculatePeriod(currentExpenses, currentContributions);
+  const current = calculatePeriod(currentExpenses, currentContributions, lifeSpace.currency);
   const budget = round(sum(selectedCategories, "budget_amount"));
 
   const categoryBreakdown = selectedCategories.map((category) => {
     const categoryExpenses = currentExpenses.filter((row) => row.category_id === category.id);
     const categoryContributions = currentContributions.filter((row) => row.category_id === category.id);
-    const spent = round(sum(categoryExpenses));
+    const spent = round(categoryExpenses.reduce((total, row) => total + baseAmount(row, lifeSpace.currency), 0));
     return {
       id: category.id,
       name: category.name,
       budget: category.budget_amount,
       spent,
-      raised: round(sum(categoryContributions)),
+      raised: round(categoryContributions.reduce((total, row) => total + baseAmount(row, lifeSpace.currency), 0)),
       variance: round(category.budget_amount - spent),
       utilization: category.budget_amount > 0 ? round((spent / category.budget_amount) * 100, 1) : null,
     };
@@ -179,7 +180,7 @@ function buildAnalytics({ lifeSpace, categories, expenses, contributions, filter
       && (!categoryId || row.category_id === categoryId)
       && inRange(contributionDate(row), range.from, range.to)
     );
-    const previous = calculatePeriod(previousExpenses, previousContributions);
+    const previous = calculatePeriod(previousExpenses, previousContributions, lifeSpace.currency);
     comparison = {
       range,
       previous,
@@ -192,7 +193,7 @@ function buildAnalytics({ lifeSpace, categories, expenses, contributions, filter
     };
   }
 
-  const topVendors = groupVendors(currentExpenses);
+  const topVendors = groupVendors(currentExpenses, lifeSpace.currency);
   const durationDays = filters.from && filters.to ? daysBetween(filters.from, filters.to) : null;
   const summary = {
     ...current,
@@ -201,15 +202,16 @@ function buildAnalytics({ lifeSpace, categories, expenses, contributions, filter
     durationDays,
     dailyAverageSpent: durationDays ? round(current.spent / durationDays) : null,
   };
-  const uncategorizedSpent = round(sum(currentExpenses.filter((row) => !row.category_id)));
+  const uncategorizedSpent = round(currentExpenses.filter((row) => !row.category_id)
+    .reduce((total, row) => total + baseAmount(row, lifeSpace.currency), 0));
   return {
     filters: { from: filters.from || null, to: filters.to || null, categoryId, comparison: filters.comparison },
     currency: lifeSpace.currency,
     summary: { ...summary, uncategorizedSpent },
     comparison,
     categoryBreakdown,
-    monthlyTrend: groupMonthly(currentExpenses),
-    dailyTrend: groupDaily(currentExpenses),
+    monthlyTrend: groupMonthly(currentExpenses, lifeSpace.currency),
+    dailyTrend: groupDaily(currentExpenses, lifeSpace.currency),
     statusBreakdown: groupStatuses(currentExpenses),
     topVendors,
     insights: buildInsights(summary, categoryBreakdown, topVendors),

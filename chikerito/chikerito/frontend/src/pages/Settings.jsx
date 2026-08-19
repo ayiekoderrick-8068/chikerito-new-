@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api";
@@ -6,6 +6,7 @@ import Topbar from "../components/Topbar.jsx";
 import { fileToResizedDataUrl } from "../imageUtils.js";
 import { can } from "../permissions.js";
 import SecuritySettings from "../components/SecuritySettings.jsx";
+import { FALLBACK_CURRENCIES } from "../currency.js";
 
 export default function Settings() {
   const { current, refresh } = useLifeSpace();
@@ -16,21 +17,35 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [imageError, setImageError] = useState("");
+  const [currencies, setCurrencies] = useState(FALLBACK_CURRENCIES);
+  const [currenciesLoading, setCurrenciesLoading] = useState(true);
+  const [currenciesError, setCurrenciesError] = useState("");
   const [form, setForm] = useState(
     current
       ? {
           title: current.title,
           goalAmount: current.goal_amount,
+          currency: current.currency || "USD",
           story: current.story,
           coverImage: current.cover_image || "",
           visibility: current.visibility,
           showBudgetPublic: current.show_budget_public,
           allowIndexing: current.allow_indexing,
         }
-      : { title: "", goalAmount: 0, story: "", coverImage: "", visibility: "private", showBudgetPublic: false, allowIndexing: false }
+      : { title: "", goalAmount: 0, currency: "USD", story: "", coverImage: "", visibility: "private", showBudgetPublic: false, allowIndexing: false }
   );
   const [requirePasscode, setRequirePasscode] = useState(current?.hasPasscode || false);
   const [passcodeInput, setPasscodeInput] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setCurrenciesLoading(true);
+    Promise.resolve(api.listCurrencies())
+      .then(({ currencies: available }) => { if (active) { setCurrencies(available); setCurrenciesError(""); } })
+      .catch((err) => { if (active) setCurrenciesError(err.message); })
+      .finally(() => { if (active) setCurrenciesLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   async function handleCoverChange(e) {
     const file = e.target.files[0];
@@ -68,6 +83,8 @@ export default function Settings() {
       await refresh();
       setPasscodeInput("");
       setSaved(true);
+    } catch (err) {
+      setError(err.message || "Settings could not be saved");
     } finally {
       setSaving(false);
     }
@@ -102,8 +119,17 @@ export default function Settings() {
                 <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
               </div>
               <div className="field">
-                <label>Goal amount (USD)</label>
+                <label>Goal amount ({form.currency})</label>
                 <input type="number" value={form.goalAmount} onChange={(e) => setForm({ ...form, goalAmount: e.target.value })} />
+              </div>
+              <div className="field">
+                <label htmlFor="base-currency">Base currency</label>
+                <select id="base-currency" value={form.currency} disabled={currenciesLoading} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+                  {currencies.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}
+                </select>
+                {currenciesLoading && <small className="currency-help">Loading supported currencies…</small>}
+                {currenciesError && <small className="currency-error">Currency list unavailable: {currenciesError}. Using built-in options.</small>}
+                <small className="currency-help">The base currency locks after the first expense, contribution, or recurring expense.</small>
               </div>
               <div className="field">
                 <label>Story</label>

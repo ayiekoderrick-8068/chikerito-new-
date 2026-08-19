@@ -5,6 +5,7 @@ const { requireMember } = require("../middleware/authorize");
 const { sanitizeLifeSpace } = require("../serialize");
 const { runDueOccurrences, nextOccurrenceWithExceptions } = require("../recurrence");
 const { isCountable } = require("./contributions");
+const { baseAmount, transactionView } = require("../currency");
 
 const router = express.Router();
 
@@ -23,8 +24,8 @@ router.get("/lifespaces/:id/dashboard", requireAuth, requireMember("id"), (req, 
   const categories = db.table("budget_categories").where((c) => c.life_space_id === lifeSpace.id);
   const recurringRules = db.table("recurring_expenses").where((r) => r.life_space_id === lifeSpace.id);
 
-  const raised = contributions.reduce((s, c) => s + c.amount, 0);
-  const spent = expenses.reduce((s, e) => s + e.amount, 0);
+  const raised = contributions.reduce((s, c) => s + baseAmount(c, lifeSpace.currency), 0);
+  const spent = expenses.reduce((s, e) => s + baseAmount(e, lifeSpace.currency), 0);
   const available = Math.max(raised - spent, 0);
   const remainingGoal = Math.max(lifeSpace.goal_amount - raised, 0);
   const progress = lifeSpace.goal_amount > 0 ? Math.min(Math.round((raised / lifeSpace.goal_amount) * 100), 100) : 0;
@@ -41,6 +42,8 @@ router.get("/lifespaces/:id/dashboard", requireAuth, requireMember("id"), (req, 
         recurringExpenseId: rule.id,
         vendor: rule.vendor,
         amount: rule.amount,
+        money: transactionView(rule, lifeSpace.currency),
+        baseAmount: baseAmount(rule, lifeSpace.currency),
         categoryId: rule.category_id,
         category: categoryNames.get(rule.category_id) || null,
         dueDate,
@@ -58,16 +61,16 @@ router.get("/lifespaces/:id/dashboard", requireAuth, requireMember("id"), (req, 
   // Calculate projected spending per category (current + upcoming)
   const projectedSpending = {};
   categories.forEach((c) => {
-    const currentSpent = expenses.filter((x) => x.category_id === c.id).reduce((s, x) => s + x.amount, 0);
+    const currentSpent = expenses.filter((x) => x.category_id === c.id).reduce((s, x) => s + baseAmount(x, lifeSpace.currency), 0);
     const upcomingSpent = allUpcoming
       .filter((x) => x.categoryId === c.id)
-      .reduce((s, x) => s + x.amount, 0);
+      .reduce((s, x) => s + x.baseAmount, 0);
     projectedSpending[c.id] = { current: currentSpent, upcoming: upcomingSpent, total: currentSpent + upcomingSpent };
   });
 
   const categoryBreakdown = categories.map((c) => {
-    const catRaised = contributions.filter((x) => x.category_id === c.id).reduce((s, x) => s + x.amount, 0);
-    const catSpent = expenses.filter((x) => x.category_id === c.id).reduce((s, x) => s + x.amount, 0);
+    const catRaised = contributions.filter((x) => x.category_id === c.id).reduce((s, x) => s + baseAmount(x, lifeSpace.currency), 0);
+    const catSpent = expenses.filter((x) => x.category_id === c.id).reduce((s, x) => s + baseAmount(x, lifeSpace.currency), 0);
     const projected = projectedSpending[c.id];
     const projectedOver = c.budget_amount > 0 && projected && projected.total > c.budget_amount;
     return {
@@ -90,7 +93,7 @@ router.get("/lifespaces/:id/dashboard", requireAuth, requireMember("id"), (req, 
   const monthly = {};
   expenses.forEach((e) => {
     const key = (e.payment_date || e.created_at).slice(0, 7);
-    monthly[key] = (monthly[key] || 0) + e.amount;
+    monthly[key] = (monthly[key] || 0) + baseAmount(e, lifeSpace.currency);
   });
   const monthlyTrend = Object.entries(monthly)
     .sort(([a], [b]) => (a > b ? 1 : -1))
@@ -147,7 +150,8 @@ router.get("/lifespaces/:id/dashboard", requireAuth, requireMember("id"), (req, 
     notifications,
     recentContributions: allContributions
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 8),
+      .slice(0, 8)
+      .map((contribution) => ({ ...contribution, money: transactionView(contribution, lifeSpace.currency) })),
   });
 });
 

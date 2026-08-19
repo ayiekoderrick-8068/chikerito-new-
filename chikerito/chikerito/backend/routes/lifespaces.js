@@ -5,6 +5,7 @@ const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const { requireMember, requireCapability, hasCapability, roleFor, INVITABLE_ROLES } = require("../middleware/authorize");
 const { sanitizeLifeSpace } = require("../serialize");
+const { currencyCode, currencyError, hasFinancialActivity } = require("../currency");
 const {
   isArchived,
   archiveConflict,
@@ -54,6 +55,8 @@ router.post("/", requireAuth, (req, res) => {
   if (!title || !milestoneType) {
     return res.status(400).json({ error: "title and milestoneType are required" });
   }
+  const baseCurrency = currencyCode(currency);
+  if (!baseCurrency) return res.status(400).json({ error: currencyError(currency) });
   const lifeSpace = db.table("life_spaces").insert({
     id: uuid(),
     owner_id: req.user.id,
@@ -61,7 +64,7 @@ router.post("/", requireAuth, (req, res) => {
     milestone_type: milestoneType,
     story: story || "",
     goal_amount: Number(goalAmount) || 0,
-    currency: currency || "USD",
+    currency: baseCurrency,
     theme: theme || "classic",
     visibility: "private", // safe by default — owner opts in to making it public
     show_budget_public: false,
@@ -105,12 +108,20 @@ router.patch("/:id", requireAuth, requireMember("id"), (req, res) => {
     return res.status(403).json({ error: "Your role does not allow this action" });
   }
 
-  const allowed = ["title", "story", "goalAmount", "theme", "visibility", "showBudgetPublic", "allowIndexing", "coverImage"];
+  if (req.body.currency !== undefined) {
+    const nextCurrency = currencyCode(req.body.currency, req.lifeSpace.currency);
+    if (!nextCurrency) return res.status(400).json({ error: currencyError(req.body.currency) });
+    if (nextCurrency !== (req.lifeSpace.currency || "USD") && hasFinancialActivity(db, req.lifeSpace.id)) {
+      return res.status(409).json({ error: "Base currency cannot be changed after financial activity has been recorded" });
+    }
+  }
+
+  const allowed = ["title", "story", "goalAmount", "currency", "theme", "visibility", "showBudgetPublic", "allowIndexing", "coverImage"];
   const columnMap = { goalAmount: "goal_amount", showBudgetPublic: "show_budget_public", allowIndexing: "allow_indexing", coverImage: "cover_image" };
   const patch = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) {
-      patch[columnMap[key] || key] = key === "goalAmount" ? Number(req.body[key]) : req.body[key];
+      patch[columnMap[key] || key] = key === "goalAmount" ? Number(req.body[key]) : key === "currency" ? currencyCode(req.body[key]) : req.body[key];
     }
   }
   // passcode is handled separately: a non-empty string sets/replaces it, an explicit empty string clears it

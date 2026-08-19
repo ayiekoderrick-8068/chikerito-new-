@@ -6,6 +6,7 @@
 // repeatedly on the same day is a no-op — see last_generated_date below.
 const { v4: uuid } = require("uuid");
 const db = require("./db");
+const { monetaryFields, transactionView, roundForCurrency } = require("./currency");
 
 const FREQUENCIES = ["weekly", "biweekly", "monthly", "quarterly", "yearly"];
 
@@ -171,6 +172,13 @@ function runDueOccurrences(lifeSpaceId) {
       if (materializedOccurrence(recurring.id, occurrenceDate)) return;
       const effective = effectiveOccurrence(recurring, occurrenceDate);
       if (effective.skipped || effective.effectiveDate > today) return;
+      const lifeSpace = db.table("life_spaces").find(lifeSpaceId);
+      const snapshot = transactionView(recurring, lifeSpace?.currency || "USD");
+      const money = {
+        ...snapshot,
+        originalAmount: effective.amount,
+        baseAmount: roundForCurrency(effective.amount * snapshot.exchangeRate, snapshot.baseCurrency),
+      };
       db.table("expenses").insert({
         id: uuid(),
         life_space_id: lifeSpaceId,
@@ -178,6 +186,8 @@ function runDueOccurrences(lifeSpaceId) {
         vendor: effective.vendor,
         planned_amount: effective.amount,
         amount: effective.amount,
+        ...monetaryFields(money),
+        ...monetaryFields(money, "planned"),
         invoice_url: null,
         receipt_url: null,
         payment_date: effective.effectiveDate,

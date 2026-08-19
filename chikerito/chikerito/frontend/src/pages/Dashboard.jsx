@@ -4,6 +4,7 @@ import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Link } from "react-router-dom";
+import { conversionLabel, formatMoney, moneyView } from "../currency.js";
 
 const COLORS = ["#1f4fa3", "#b08d57", "#4472c4", "#d4b483", "#2f9e63", "#c97a2b", "#8e6fb0", "#5a9bd5"];
 
@@ -56,6 +57,7 @@ export default function Dashboard() {
   }
 
   const { stats, categoryBreakdown, financialHealth, upcomingRecurringExpenses, notifications, recentContributions } = data;
+  const baseCurrency = stats.currency || current?.currency || "USD";
   const pieData = categoryBreakdown.filter((c) => c.spent > 0).map((c) => ({ name: c.name, value: c.spent }));
 
   return (
@@ -63,11 +65,11 @@ export default function Dashboard() {
       <Topbar title="Mission Control" />
       <div className="page-body">
         <div className="stat-grid">
-          <div className="stat-card"><div className="label">Goal</div><div className="value">${stats.goal.toLocaleString()}</div></div>
-          <div className="stat-card"><div className="label">Raised</div><div className="value">${stats.raised.toLocaleString()}</div></div>
-          <div className="stat-card"><div className="label">Spent</div><div className="value">${stats.spent.toLocaleString()}</div></div>
-          <div className="stat-card accent"><div className="label">Available Balance</div><div className="value">${stats.available.toLocaleString()}</div></div>
-          <div className="stat-card"><div className="label">Remaining Goal</div><div className="value">${stats.remainingGoal.toLocaleString()}</div></div>
+          <div className="stat-card"><div className="label">Goal</div><div className="value">{formatMoney(stats.goal, baseCurrency)}</div></div>
+          <div className="stat-card"><div className="label">Raised</div><div className="value">{formatMoney(stats.raised, baseCurrency)}</div></div>
+          <div className="stat-card"><div className="label">Spent</div><div className="value">{formatMoney(stats.spent, baseCurrency)}</div></div>
+          <div className="stat-card accent"><div className="label">Available Balance</div><div className="value">{formatMoney(stats.available, baseCurrency)}</div></div>
+          <div className="stat-card"><div className="label">Remaining Goal</div><div className="value">{formatMoney(stats.remainingGoal, baseCurrency)}</div></div>
         </div>
 
         <div className="card" style={{ marginBottom: 24 }}>
@@ -91,7 +93,7 @@ export default function Dashboard() {
                       <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v) => `$${v.toLocaleString()}`} />
+                  <Tooltip formatter={(v) => formatMoney(v, baseCurrency)} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -134,7 +136,10 @@ export default function Dashboard() {
                       <td>{new Date(`${r.dueDate}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: "UTC" })}</td>
                       <td>{r.vendor}</td>
                       <td>{r.category || category?.name || "—"}</td>
-                      <td>${r.amount.toLocaleString()}</td>
+                      <td>
+                        {formatMoney(moneyView(r, baseCurrency).originalAmount, moneyView(r, baseCurrency).currency, { showCode: moneyView(r, baseCurrency).currency !== baseCurrency })}
+                        {conversionLabel(r, baseCurrency) && <small className="currency-conversion">≈ {conversionLabel(r, baseCurrency)}</small>}
+                      </td>
                     </tr>
                   );
                 })}
@@ -162,7 +167,10 @@ export default function Dashboard() {
                   {recentContributions.map((c) => (
                     <tr key={c.id}>
                       <td>{c.contributor_name}</td>
-                      <td>${c.amount.toLocaleString()}</td>
+                      <td>
+                        {formatMoney(moneyView(c, baseCurrency).originalAmount, moneyView(c, baseCurrency).currency, { showCode: moneyView(c, baseCurrency).currency !== baseCurrency })}
+                        {conversionLabel(c, baseCurrency) && <small className="currency-conversion">≈ {conversionLabel(c, baseCurrency)}</small>}
+                      </td>
                       <td style={{ color: "var(--text-muted)" }}>{c.message}</td>
                     </tr>
                   ))}

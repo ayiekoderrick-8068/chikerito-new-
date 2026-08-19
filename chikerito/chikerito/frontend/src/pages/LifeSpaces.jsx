@@ -3,6 +3,7 @@ import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
 import { fileToResizedDataUrl } from "../imageUtils.js";
+import { FALLBACK_CURRENCIES, formatMoney } from "../currency.js";
 
 const MILESTONE_TYPES = ["wedding", "graduation", "medical", "business", "baby_shower", "home", "travel", "birthday", "community", "custom"];
 
@@ -14,7 +15,7 @@ function archivedLabel(value) {
 export default function LifeSpaces() {
   const { lifeSpaces, currentId, refresh, selectLifeSpace } = useLifeSpace();
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ title: "", milestoneType: "wedding", goalAmount: 0, story: "", coverImage: "" });
+  const [form, setForm] = useState({ title: "", milestoneType: "wedding", goalAmount: 0, currency: "USD", story: "", coverImage: "" });
   const [saving, setSaving] = useState(false);
   const [imageError, setImageError] = useState("");
   const [managedSpaces, setManagedSpaces] = useState(null);
@@ -196,7 +197,7 @@ export default function LifeSpaces() {
       await refresh();
       selectLifeSpace(lifeSpace.id);
       setShowModal(false);
-      setForm({ title: "", milestoneType: "wedding", goalAmount: 0, story: "", coverImage: "" });
+      setForm({ title: "", milestoneType: "wedding", goalAmount: 0, currency: "USD", story: "", coverImage: "" });
       await loadLifeSpaces();
     } finally {
       setSaving(false);
@@ -291,11 +292,12 @@ export default function LifeSpaces() {
                 </div>
                 <h3 style={{ margin: "0 0 8px" }}>{ls.title}</h3>
                 <p style={{ color: "var(--text-muted)", fontSize: 14, minHeight: 40 }}>{ls.story}</p>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Goal: {formatMoney(ls.goal_amount, ls.currency || "USD", { showCode: true })}</div>
                 {isArchived && <div className="archived-meta">
                   <span>{archivedLabel(ls.archived_at)}</span>
                   {ls.archive_reason && <span title={ls.archive_reason}>Reason: {ls.archive_reason}</span>}
                 </div>}
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Goal: ${Number(ls.goal_amount).toLocaleString()}</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Goal: {formatMoney(ls.goal_amount, ls.currency || "USD", { showCode: true })}</div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="btn btn-outline btn-sm" disabled={isActive || isArchived} onClick={() => selectLifeSpace(ls.id)}>
                     {isActive ? "Active" : "Set Active"}
@@ -343,8 +345,14 @@ export default function LifeSpaces() {
                 </select>
               </div>
               <div className="field">
-                <label>Goal amount (USD)</label>
+                <label>Goal amount ({form.currency})</label>
                 <input type="number" min="0" required value={form.goalAmount} onChange={(e) => setForm({ ...form, goalAmount: e.target.value })} />
+              </div>
+              <div className="field">
+                <label htmlFor="new-space-currency">Base currency</label>
+                <select id="new-space-currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+                  {FALLBACK_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}
+                </select>
               </div>
               <div className="field">
                 <label>Your story</label>

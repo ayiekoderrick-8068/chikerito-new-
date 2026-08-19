@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
+import { FALLBACK_CURRENCIES, conversionLabel, formatMoney, moneyView } from "../currency.js";
 
 const STATUS_COLORS = {
   pending: "#ffa500",
@@ -21,6 +22,7 @@ const STATUS_TRANSITIONS = {
 
 export default function Contributions() {
   const { currentId, current } = useLifeSpace();
+  const baseCurrency = current?.currency || "USD";
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,6 +31,7 @@ export default function Contributions() {
   const [formData, setFormData] = useState({
     contributorName: "",
     amount: "",
+    currency: "USD",
     categoryId: "",
     message: "",
     paymentMethod: "manual",
@@ -90,6 +93,7 @@ export default function Contributions() {
       const payload = {
         contributorName: formData.contributorName || "Anonymous",
         amount: parseFloat(formData.amount),
+        currency: formData.currency,
         categoryId: formData.categoryId || null,
         message: formData.message,
         paymentMethod: formData.paymentMethod,
@@ -103,6 +107,7 @@ export default function Contributions() {
       setFormData({
         contributorName: "",
         amount: "",
+        currency: baseCurrency,
         categoryId: "",
         message: "",
         paymentMethod: "manual",
@@ -183,7 +188,10 @@ export default function Contributions() {
             >
               Copy Link
             </button>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowForm(!showForm)}>
+            <button className="btn btn-primary btn-sm" onClick={() => {
+              if (!showForm) setFormData((value) => ({ ...value, currency: baseCurrency }));
+              setShowForm(!showForm);
+            }}>
               {showForm ? "Cancel" : "+ Add Manually"}
             </button>
           </div>
@@ -218,6 +226,12 @@ export default function Contributions() {
                     min="0.01"
                     required
                   />
+                </div>
+                <div className="field">
+                  <label htmlFor="contribution-currency">Currency</label>
+                  <select id="contribution-currency" name="currency" value={formData.currency} onChange={handleFormChange}>
+                    {FALLBACK_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}
+                  </select>
                 </div>
                 <div className="field">
                   <label>Category</label>
@@ -303,7 +317,10 @@ export default function Contributions() {
                   <tr key={c.id}>
                     <td>{new Date(c.created_at).toLocaleDateString()}</td>
                     <td>{c.contributor_name}</td>
-                    <td>${c.amount.toLocaleString()}</td>
+                    <td>
+                      {formatMoney(moneyView(c, baseCurrency).originalAmount, moneyView(c, baseCurrency).currency, { showCode: moneyView(c, baseCurrency).currency !== baseCurrency })}
+                      {conversionLabel(c, baseCurrency) && <small className="currency-conversion">≈ {conversionLabel(c, baseCurrency)}</small>}
+                    </td>
                     <td>{c.payment_method}</td>
                     <td>{getStatusBadge(c.status)}</td>
                     <td style={{ color: "var(--text-muted)" }}>{c.message}</td>

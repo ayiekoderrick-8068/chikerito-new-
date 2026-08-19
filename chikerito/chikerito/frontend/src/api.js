@@ -41,6 +41,7 @@ function withPasscode(path, passcode) {
 }
 
 export const api = {
+  listCurrencies: () => request("/currencies", { auth: false }),
   register: (payload) => request("/auth/register", { method: "POST", body: payload, auth: false }),
   login: (payload) => request("/auth/login", { method: "POST", body: payload, auth: false }),
   me: () => request("/auth/me"),
