@@ -61,6 +61,15 @@ export const api = {
   getLifeSpaceDeletionImpact: (id) => request(`/lifespaces/${id}/deletion-impact`),
   deleteLifeSpace: (id, payload = {}) => request(`/lifespaces/${id}`, { method: "DELETE", body: payload }),
   getDashboard: (id) => request(`/lifespaces/${id}/dashboard`),
+  getAnalytics: (id, filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.categoryId) params.set("categoryId", filters.categoryId);
+    if (filters.comparison && filters.comparison !== "none") params.set("comparison", filters.comparison);
+    const query = params.toString();
+    return request(`/lifespaces/${id}/analytics${query ? `?${query}` : ""}`);
+  },
   getPublicReport: (slug, passcode) => request(withPasscode(`/public/lifespaces/${slug}/report`, passcode), { auth: false }),
 
   listCategories: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/categories`),
@@ -89,6 +98,26 @@ export const api = {
   pauseRecurringExpense: (id) => request(`/recurring-expenses/${id}/pause`, { method: "POST" }),
   resumeRecurringExpense: (id) => request(`/recurring-expenses/${id}/resume`, { method: "POST" }),
   deleteRecurringExpense: (id) => request(`/recurring-expenses/${id}`, { method: "DELETE" }),
+  listRecurringOccurrences: (id, { from, to, limit } = {}) => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (limit) params.set("limit", limit);
+    const query = params.toString();
+    return request(`/recurring-expenses/${id}/occurrences${query ? `?${query}` : ""}`);
+  },
+  listRecurringExceptions: (id) => request(`/recurring-expenses/${id}/exceptions`),
+  createRecurringException: (id, payload) => request(`/recurring-expenses/${id}/exceptions`, { method: "POST", body: payload }),
+  updateRecurringException: (id, payload) => request(`/recurring-expense-exceptions/${id}`, { method: "PATCH", body: payload }),
+  removeRecurringException: (id) => request(`/recurring-expense-exceptions/${id}`, { method: "DELETE" }),
+  restoreRecurringException: (id) => request(`/recurring-expense-exceptions/${id}/restore`, { method: "POST" }),
+
+  listBudgetScenarios: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/budget-scenarios`),
+  getBudgetScenario: (id) => request(`/budget-scenarios/${id}`),
+  previewBudgetScenario: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/budget-scenarios/preview`, { method: "POST", body: payload }),
+  createBudgetScenario: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/budget-scenarios`, { method: "POST", body: payload }),
+  updateBudgetScenario: (id, payload) => request(`/budget-scenarios/${id}`, { method: "PATCH", body: payload }),
+  deleteBudgetScenario: (id) => request(`/budget-scenarios/${id}`, { method: "DELETE" }),
 
   listContributions: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/contributions`),
   createContribution: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/contributions`, { method: "POST", body: payload }),
@@ -114,11 +143,18 @@ export const api = {
   createTask: (lifeSpaceId, payload) => request(`/lifespaces/${lifeSpaceId}/tasks`, { method: "POST", body: payload }),
   updateTask: (id, payload) => request(`/tasks/${id}`, { method: "PATCH", body: payload }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: "DELETE" }),
+  addTaskDependency: (id, dependencyTaskId) => request(`/tasks/${id}/dependencies`, { method: "POST", body: { dependencyTaskId } }),
+  replaceTaskDependencies: (id, dependencyTaskIds) => request(`/tasks/${id}/dependencies`, { method: "PUT", body: { dependencyTaskIds } }),
+  removeTaskDependency: (id, dependencyTaskId) => request(`/tasks/${id}/dependencies/${dependencyTaskId}`, { method: "DELETE" }),
 
-  listNotifications: (lifeSpaceId, { unreadOnly, before, limit } = {}) => {
+  listNotifications: (lifeSpaceId, { unreadOnly, filter, type, q, before, cursor, limit } = {}) => {
     const params = new URLSearchParams();
     if (unreadOnly) params.set("unreadOnly", "true");
+    if (filter) params.set("filter", filter);
+    if (type) params.set("type", type);
+    if (q) params.set("q", q);
     if (before) params.set("before", before);
+    if (cursor) params.set("cursor", cursor);
     if (limit) params.set("limit", limit);
     const qs = params.toString();
     return request(`/lifespaces/${lifeSpaceId}/notifications${qs ? `?${qs}` : ""}`);
@@ -127,6 +163,17 @@ export const api = {
   markAllNotificationsRead: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/notifications/mark-all-read`, { method: "POST" }),
   setNotificationRead: (id, read) => request(`/notifications/${id}`, { method: "PATCH", body: { read } }),
   deleteNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
+  restoreNotification: (id) => request(`/notifications/${id}/restore`, { method: "POST" }),
+
+  listAuditLogs: (lifeSpaceId, filters = {}) => {
+    const params = new URLSearchParams();
+    for (const key of ["action", "resourceType", "actorId", "from", "to", "cursor", "limit"]) {
+      if (filters[key]) params.set(key, filters[key]);
+    }
+    const query = params.toString();
+    return request(`/lifespaces/${lifeSpaceId}/audit-logs${query ? `?${query}` : ""}`);
+  },
+  getAuditFilterOptions: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/audit-logs/filter-options`),
 };
 
 export { getToken };

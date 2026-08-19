@@ -15,7 +15,9 @@ export default defineConfig({
     globals: true,
     css: false,
     restoreMocks: true,
-    // Keep lifecycle modal state and fake timers isolated across files.
+    // The UI suites exercise timers, document listeners, and optimistic async
+    // state heavily. A single worker keeps those process-wide resources
+    // isolated and avoids CPU-contention timeouts without relaxing assertions.
     minWorkers: 1,
     maxWorkers: 1,
   },

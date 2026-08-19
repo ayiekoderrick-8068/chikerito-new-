@@ -152,10 +152,13 @@ describe("Task 7 F2P: ownership safeguards and controlled deletion", () => {
     await createTask(owner.token, space.id);
     db.table("contributions").insert({ id: uuid(), life_space_id: space.id, amount: 10 });
     db.table("recurring_expenses").insert({ id: uuid(), life_space_id: space.id, vendor: "Rent" });
+    for (const table of ["recurring_expense_exceptions", "budget_scenarios", "budget_scenario_adjustments", "task_dependencies", "notification_user_states", "audit_logs"]) {
+      db.table(table).insert({ id: uuid(), life_space_id: space.id });
+    }
     await archive(owner, space.id);
     const response = await api().delete(`/api/lifespaces/${space.id}`).set(owner.headers).send({ confirmDelete: true, confirmationTitle: space.title });
     expect(response.status).toBe(204);
-    for (const table of ["team_members", "invitations", "budget_categories", "contributions", "expenses", "recurring_expenses", "tasks", "notifications"]) {
+    for (const table of ["team_members", "invitations", "budget_categories", "contributions", "expenses", "recurring_expenses", "recurring_expense_exceptions", "budget_scenarios", "budget_scenario_adjustments", "tasks", "task_dependencies", "notifications", "notification_user_states", "audit_logs"]) {
       expect(rawState()[table].filter((row) => row.life_space_id === space.id)).toEqual([]);
     }
   });

@@ -7,8 +7,14 @@ const CASCADE_TABLES = [
   "contributions",
   "expenses",
   "recurring_expenses",
+  "recurring_expense_exceptions",
+  "budget_scenarios",
+  "budget_scenario_adjustments",
   "tasks",
+  "task_dependencies",
   "notifications",
+  "notification_user_states",
+  "audit_logs",
 ];
 
 function isArchived(lifeSpace) {
@@ -27,7 +33,7 @@ function deletionImpact(lifeSpaceId) {
     counts[table] = db.table(table).count((row) => row.life_space_id === lifeSpaceId);
   }
   const dependentRecords = Object.entries(counts).reduce((total, [table, count]) => (
-    total + (["team_members", "invitations", "notifications"].includes(table) ? 0 : count)
+    total + (["team_members", "invitations", "notifications", "notification_user_states", "audit_logs"].includes(table) ? 0 : count)
   ), 0);
   return {
     counts,

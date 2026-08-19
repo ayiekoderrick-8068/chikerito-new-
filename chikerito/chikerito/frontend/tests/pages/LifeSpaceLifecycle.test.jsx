@@ -64,6 +64,7 @@ describe("Life Space lifecycle listing", () => {
   it("shows a loading state when neither context nor lifecycle data is ready", () => {
     context({ lifeSpaces: [], currentId: null, current: null });
     api.listLifeSpaces.mockReturnValue(new Promise(() => {}));
+    api.listPendingInvitationsForMe.mockReturnValue(new Promise(() => {}));
     renderPage();
     expect(screen.getByRole("status")).toHaveTextContent("Loading life spaces");
   });
