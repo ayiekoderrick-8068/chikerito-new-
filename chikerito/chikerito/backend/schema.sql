@@ -47,6 +47,11 @@ CREATE TABLE life_spaces (
   cover_image    VARCHAR(500),
   slug           VARCHAR(255) UNIQUE,
   status         VARCHAR(20) DEFAULT 'active',    -- active | completed | archived
+  archived_at    TIMESTAMP,
+  archived_by    UUID REFERENCES users(id),
+  archive_reason VARCHAR(500),
+  restored_at    TIMESTAMP,
+  restored_by    UUID REFERENCES users(id),
   created_at     TIMESTAMP DEFAULT now()
 );
 

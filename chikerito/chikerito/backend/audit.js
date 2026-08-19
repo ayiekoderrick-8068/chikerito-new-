@@ -179,6 +179,9 @@ function auditMutations(req, res, next) {
     if (res.statusCode < 200 || res.statusCode >= 300) return;
     const descriptor = describeMutation({ path: originalPath, method: req.method, body: req.body }, responseBody, snapshot);
     if (!descriptor) return;
+    // Permanent life-space deletion purges its audit history. Do not recreate
+    // an orphan record after the response has completed.
+    if (descriptor.action === "life_space.deleted" && !db.table("life_spaces").find(descriptor.lifeSpaceId)) return;
     writeAudit({
       ...descriptor,
       actor: req.user || null,

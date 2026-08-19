@@ -501,6 +501,23 @@ button { font-family: inherit; cursor: pointer; }
 .notification-panel-state.error-banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px; }
 .notification-dismiss:hover { color: var(--danger); background: var(--bg); }
 
+.life-space-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.life-space-toolbar .view-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
+.life-space-summary { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; padding: 12px 16px; color: var(--text-muted); font-size: 13px; }
+.life-space-summary strong { color: var(--text); font-size: 16px; margin-right: 3px; }
+.life-space-card { transition: opacity .15s ease, border-color .15s ease; }
+.life-space-archived { opacity: .78; border-style: dashed; background: #f8fafc; }
+.archived-meta { display: flex; flex-direction: column; gap: 3px; margin: -4px 0 12px; color: var(--text-muted); font-size: 12px; }
+.archived-meta span[title] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.life-space-lifecycle-actions { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--border); margin-top: 14px; padding-top: 12px; }
+.danger-text { color: var(--danger) !important; }
+.danger-button { background: var(--danger); border-color: var(--danger); }
+.deletion-confirmation > p { color: var(--text-muted); line-height: 1.55; }
+.deletion-impact { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; margin: 14px 0; padding: 12px; background: var(--bg); border-radius: 10px; }
+.deletion-impact > div { display: flex; justify-content: space-between; gap: 10px; text-transform: capitalize; }
+.deletion-impact dt { color: var(--text-muted); }
+.deletion-impact dd { margin: 0; font-weight: 700; }
+
 @media (max-width: 640px) {
   .notification-panel { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; }
 }
