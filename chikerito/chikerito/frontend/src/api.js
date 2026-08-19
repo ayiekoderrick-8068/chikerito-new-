@@ -56,6 +56,15 @@ export const api = {
   getLifeSpace: (id) => request(`/lifespaces/${id}`),
   updateLifeSpace: (id, payload) => request(`/lifespaces/${id}`, { method: "PATCH", body: payload }),
   getDashboard: (id) => request(`/lifespaces/${id}/dashboard`),
+  getAnalytics: (id, filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.categoryId) params.set("categoryId", filters.categoryId);
+    if (filters.comparison && filters.comparison !== "none") params.set("comparison", filters.comparison);
+    const query = params.toString();
+    return request(`/lifespaces/${id}/analytics${query ? `?${query}` : ""}`);
+  },
   getPublicReport: (slug, passcode) => request(withPasscode(`/public/lifespaces/${slug}/report`, passcode), { auth: false }),
 
   listCategories: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/categories`),
@@ -127,6 +136,16 @@ export const api = {
   setNotificationRead: (id, read) => request(`/notifications/${id}`, { method: "PATCH", body: { read } }),
   deleteNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
   restoreNotification: (id) => request(`/notifications/${id}/restore`, { method: "POST" }),
+
+  listAuditLogs: (lifeSpaceId, filters = {}) => {
+    const params = new URLSearchParams();
+    for (const key of ["action", "resourceType", "actorId", "from", "to", "cursor", "limit"]) {
+      if (filters[key]) params.set(key, filters[key]);
+    }
+    const query = params.toString();
+    return request(`/lifespaces/${lifeSpaceId}/audit-logs${query ? `?${query}` : ""}`);
+  },
+  getAuditFilterOptions: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/audit-logs/filter-options`),
 };
 
 export { getToken };

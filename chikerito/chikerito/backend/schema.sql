@@ -154,3 +154,15 @@ CREATE TABLE notification_user_states (
   updated_at      TIMESTAMPTZ DEFAULT now(),
   UNIQUE(notification_id, user_id)
 );
+
+CREATE TABLE audit_logs (
+  id            UUID PRIMARY KEY,
+  life_space_id UUID REFERENCES life_spaces(id),
+  actor_id      UUID REFERENCES users(id) NULL,
+  actor_name    VARCHAR(220) NOT NULL,
+  action        VARCHAR(80) NOT NULL,
+  resource_type VARCHAR(50) NOT NULL,
+  resource_id   UUID,
+  metadata      JSON NOT NULL,
+  occurred_at   TIMESTAMP DEFAULT now()
+);
