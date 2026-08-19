@@ -6,6 +6,7 @@ const { requireMember, requireCapability, requireResourceCapability } = require(
 const { pushNotification } = require("../notify");
 const { findPublicLifeSpace, checkPublicAccess } = require("../publicAccess");
 const { normalizeTransaction, monetaryFields, transactionView, baseAmount } = require("../currency");
+const crypto = require("crypto");
 
 const router = express.Router();
 
@@ -140,7 +141,7 @@ router.patch("/contributions/:id", requireAuth, requireResourceCapability("contr
 // ---------------------------------------------------------------------------
 // Public — no auth required, used by the public donation page
 // ---------------------------------------------------------------------------
-router.post("/public/lifespaces/:slug/contribute", (req, res) => {
+router.post("/public/lifespaces/:slug/contribute", async (req, res, next) => {
   const lifeSpace = findPublicLifeSpace(req.params.slug);
   const access = checkPublicAccess(lifeSpace, req);
   if (!access.ok) return res.status(access.status).json(access.body);
@@ -153,6 +154,40 @@ router.post("/public/lifespaces/:slug/contribute", (req, res) => {
   const normalized = normalizeTransaction({ amount, currency }, lifeSpace);
   if (normalized.error) return res.status(400).json({ error: normalized.error });
 
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.STRIPE_SECRET_KEY) return res.status(503).json({ error: "Payments are not configured" });
+    try {
+      const frontendUrl = process.env.FRONTEND_URL;
+      if (!frontendUrl) return res.status(503).json({ error: "Payments are not configured" });
+      const params = new URLSearchParams();
+      params.set("mode", "payment");
+      params.set("success_url", `${frontendUrl}/donate/${encodeURIComponent(lifeSpace.slug)}?payment=success`);
+      params.set("cancel_url", `${frontendUrl}/donate/${encodeURIComponent(lifeSpace.slug)}?payment=cancelled`);
+      params.set("line_items[0][quantity]", "1");
+      params.set("line_items[0][price_data][currency]", normalized.currency.toLowerCase());
+      params.set("line_items[0][price_data][unit_amount]", String(Math.round(normalized.originalAmount * 100)));
+      params.set("line_items[0][price_data][product_data][name]", `Contribution to ${lifeSpace.title}`);
+      params.set("metadata[life_space_id]", lifeSpace.id);
+      params.set("metadata[category_id]", categoryId || "");
+      params.set("metadata[contributor_name]", (contributorName || "Anonymous").slice(0, 120));
+      params.set("metadata[message]", (message || "").slice(0, 500));
+      params.set("metadata[base_currency]", normalized.baseCurrency);
+      params.set("metadata[exchange_rate]", String(normalized.exchangeRate));
+      const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: params,
+      });
+      const session = await response.json();
+      if (!response.ok || !session.url) throw new Error(session.error?.message || "Payment provider rejected the request");
+      return res.status(201).json({ checkoutUrl: session.url });
+    } catch (error) {
+      return next(Object.assign(new Error("Unable to start payment"), { status: 502, cause: error }));
+    }
+  }
+
+  // Local/test mode uses a deterministic provider stand-in. Production can
+  // only create completed contributions through the signed webhook below.
   const contribution = db.table("contributions").insert({
     id: uuid(),
     life_space_id: lifeSpace.id,
@@ -183,4 +218,46 @@ router.post("/public/lifespaces/:slug/contribute", (req, res) => {
   res.status(201).json({ contribution: { ...contribution, money: transactionView(contribution, lifeSpace.currency) } });
 });
 
-module.exports = { router, isCountable };
+function verifyStripeSignature(rawBody, header, secret) {
+  if (!header || !secret) return false;
+  const parts = Object.fromEntries(header.split(",").map((part) => part.split("=", 2)));
+  const timestamp = Number(parts.t);
+  if (!timestamp || Math.abs(Date.now() / 1000 - timestamp) > 300 || !parts.v1) return false;
+  const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${rawBody.toString("utf8")}`).digest("hex");
+  const actual = Buffer.from(parts.v1, "hex");
+  const wanted = Buffer.from(expected, "hex");
+  return actual.length === wanted.length && crypto.timingSafeEqual(actual, wanted);
+}
+
+function stripeWebhook(req, res) {
+  if (!verifyStripeSignature(req.body, req.headers["stripe-signature"], process.env.STRIPE_WEBHOOK_SECRET)) {
+    return res.status(400).json({ error: "Invalid webhook signature" });
+  }
+  let event;
+  try { event = JSON.parse(req.body.toString("utf8")); } catch { return res.status(400).json({ error: "Malformed webhook" }); }
+  if (event.type !== "checkout.session.completed") return res.json({ received: true });
+  if (db.table("contributions").where((row) => row.provider_event_id === event.id).length) return res.json({ received: true });
+  const session = event.data?.object;
+  const lifeSpace = db.table("life_spaces").find(session?.metadata?.life_space_id);
+  if (!lifeSpace || session.payment_status !== "paid" || !Number.isInteger(session.amount_total) || session.amount_total <= 0) {
+    return res.status(400).json({ error: "Invalid completed checkout" });
+  }
+  const currency = String(session.currency || "").toUpperCase();
+  const normalized = normalizeTransaction({ amount: session.amount_total / 100, currency }, lifeSpace);
+  if (normalized.error) return res.status(400).json({ error: normalized.error });
+  const categoryId = session.metadata.category_id || null;
+  const category = categoryId ? db.table("budget_categories").find(categoryId) : null;
+  if (categoryId && (!category || category.life_space_id !== lifeSpace.id)) return res.status(400).json({ error: "Invalid category" });
+  const contribution = db.table("contributions").insert({
+    id: uuid(), life_space_id: lifeSpace.id, category_id: categoryId,
+    contributor_name: session.metadata.contributor_name || "Anonymous",
+    amount: normalized.originalAmount, ...monetaryFields(normalized),
+    message: session.metadata.message || "", payment_method: "stripe", status: "completed",
+    notes: "", source: "stripe", provider_event_id: event.id, provider_payment_id: session.payment_intent,
+    created_at: new Date().toISOString(),
+  });
+  pushNotification(lifeSpace.id, "donation", `${contribution.contributor_name} donated ${currency} ${normalized.originalAmount.toFixed(2)}`);
+  return res.status(201).json({ received: true });
+}
+
+module.exports = { router, isCountable, stripeWebhook, verifyStripeSignature };

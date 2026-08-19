@@ -8,6 +8,9 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const { AsyncLocalStorage } = require("async_hooks");
+
+const requestStorage = new AsyncLocalStorage();
 
 const DEFAULT_DB_FILE = path.join(__dirname, "data", "db.json");
 
@@ -50,6 +53,8 @@ function ensureDir(file) {
 }
 
 function load() {
+  const requestState = requestStorage.getStore();
+  if (requestState) return requestState.data;
   const file = dbFile();
   if (!fs.existsSync(file)) {
     ensureDir(file);
@@ -92,6 +97,12 @@ function writeAtomic(file, data) {
 }
 
 function save(data) {
+  const requestState = requestStorage.getStore();
+  if (requestState) {
+    requestState.data = data;
+    requestState.dirty = true;
+    return;
+  }
   writeAtomic(dbFile(), data);
 }
 
@@ -158,4 +169,8 @@ function table(name) {
   };
 }
 
-module.exports = { table, load, save, reset, useTempFile, dbFile, TABLES, DEFAULT_DB_FILE };
+function runWithState(state, callback) {
+  return requestStorage.run(state, callback);
+}
+
+module.exports = { table, load, save, reset, useTempFile, dbFile, TABLES, DEFAULT_DB_FILE, emptyState, runWithState };

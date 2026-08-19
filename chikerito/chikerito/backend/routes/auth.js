@@ -32,6 +32,7 @@ router.post("/register", async (req, res) => {
   if (!firstName || !lastName || !email || !password) {
     return res.status(400).json({ error: "firstName, lastName, email, and password are required" });
   }
+  if (String(password).length < 10) return res.status(400).json({ error: "password must be at least 10 characters" });
   const users = db.table("users");
   if (users.where((u) => u.email.toLowerCase() === email.toLowerCase()).length) {
     return res.status(409).json({ error: "An account with this email already exists" });
@@ -88,7 +89,7 @@ router.post("/forgot-password", async (req, res) => {
 
   const rawToken = crypto.randomBytes(32).toString("hex");
   const now = Date.now();
-  db.table("password_resets").insert({
+  const resetRecord = db.table("password_resets").insert({
     id: uuid(),
     user_id: user.id,
     token_hash: hashToken(rawToken),
@@ -98,8 +99,16 @@ router.post("/forgot-password", async (req, res) => {
     used_at: null,
   });
 
-  const resetUrl = `${req.headers.origin || ""}/reset-password?token=${rawToken}`;
-  notifyPasswordReset(user, resetUrl);
+  const publicOrigin = process.env.FRONTEND_URL || (process.env.NODE_ENV === "production" ? "" : req.headers.origin || "http://localhost:5173");
+  if (!publicOrigin) return res.status(503).json({ error: "Password recovery is not configured" });
+  const resetUrl = `${publicOrigin.replace(/\/$/, "")}/reset-password?token=${rawToken}`;
+  try {
+    await notifyPasswordReset(user, resetUrl);
+  } catch (error) {
+    db.table("password_resets").update(resetRecord.id, { status: "revoked" });
+    if (process.env.NODE_ENV !== "test") console.error("Password reset delivery failed", error.message);
+    return res.json(responseBody);
+  }
 
   // No real email transport exists yet (see notify.js) — surface the token
   // directly outside production so the flow is actually usable/testable.
@@ -113,7 +122,7 @@ router.post("/forgot-password", async (req, res) => {
 router.post("/reset-password", async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: "token and password are required" });
-  if (password.length < 6) return res.status(400).json({ error: "password must be at least 6 characters" });
+  if (password.length < 10) return res.status(400).json({ error: "password must be at least 10 characters" });
 
   const record = db.table("password_resets").where((r) => r.token_hash === hashToken(token))[0];
   if (!record || !isActivePendingReset(record)) {
@@ -131,6 +140,11 @@ router.post("/reset-password", async (req, res) => {
 router.get("/sessions", requireAuth, (req, res) => {
   const sessions = listActiveSessions(req.user.id);
   res.json({ sessions: sessions.map((s) => sanitizeSession(s, req.user.sid)) });
+});
+
+router.post("/logout", requireAuth, (req, res) => {
+  revokeSession(req.user.sid);
+  res.status(204).end();
 });
 
 router.delete("/sessions/:id", requireAuth, (req, res) => {

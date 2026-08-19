@@ -19,8 +19,21 @@ function pushNotification(lifeSpaceId, type, message) {
 // (console output) rather than an actual send; swap the body for a real
 // mail provider call when one exists. Kept in this file, alongside
 // pushNotification, since both are "tell someone something happened."
-function notifyPasswordReset(user, resetUrl) {
-  if (process.env.NODE_ENV !== "test") console.log(`[password reset] ${user.email}: ${resetUrl}`);
+async function notifyPasswordReset(user, resetUrl) {
+  if (process.env.NODE_ENV !== "production") return;
+  if (!process.env.EMAIL_DELIVERY_URL || !process.env.EMAIL_DELIVERY_TOKEN) {
+    throw Object.assign(new Error("Password recovery email is not configured"), { status: 503 });
+  }
+  const response = await fetch(process.env.EMAIL_DELIVERY_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.EMAIL_DELIVERY_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to: user.email,
+      template: "password-reset",
+      variables: { firstName: user.first_name, resetUrl },
+    }),
+  });
+  if (!response.ok) throw Object.assign(new Error("Password recovery email could not be sent"), { status: 502 });
 }
 
 module.exports = { pushNotification, notifyPasswordReset };

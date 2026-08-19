@@ -22,13 +22,26 @@ const budgetScenarioRoutes = require("./routes/budgetScenarios");
 const analyticsRoutes = require("./routes/analytics");
 const auditRoutes = require("./routes/auditLogs");
 const { auditMutations } = require("./audit");
+const { postgresRequest } = require("./postgres");
+const { stripeWebhook } = require("./routes/contributions");
+const { rateLimit } = require("./rateLimit");
 
 function createApp() {
   const app = express();
+  if (process.env.TRUST_PROXY) app.set("trust proxy", process.env.TRUST_PROXY);
 
-  app.use(cors());
-  app.use(express.json({ limit: "6mb" })); // cover photos are uploaded as base64 data URLs
+  const configuredOrigins = (process.env.CORS_ORIGINS || "").split(",").map((value) => value.trim()).filter(Boolean);
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || process.env.NODE_ENV !== "production" || configuredOrigins.includes(origin)) return callback(null, true);
+      return callback(Object.assign(new Error("Origin not allowed"), { status: 403 }));
+    },
+  }));
   app.use(auditMutations);
+  app.use(postgresRequest);
+  app.post("/api/payments/stripe/webhook", express.raw({ type: "application/json", limit: "256kb" }), stripeWebhook);
+  app.use(express.json({ limit: "1mb" }));
+  app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, max: process.env.NODE_ENV === "test" ? 10_000 : 100 }));
 
   app.get("/api/health", (req, res) => res.json({ status: "ok", service: "chikerito-api" }));
   app.use("/api", currencyRoutes);
@@ -57,7 +70,9 @@ function createApp() {
       return res.status(400).json({ error: "Malformed JSON body" });
     }
     if (process.env.NODE_ENV !== "test") console.error(err);
-    res.status(err.status || err.statusCode || 500).json({ error: err.message || "Internal server error" });
+    const status = err.status || err.statusCode || 500;
+    const message = status >= 500 && process.env.NODE_ENV === "production" ? "Internal server error" : (err.message || "Internal server error");
+    res.status(status).json({ error: message });
   });
 
   return app;

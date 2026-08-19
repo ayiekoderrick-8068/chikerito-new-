@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { api } from "../api";
 import PasscodeGate from "../components/PasscodeGate.jsx";
 import NoIndexTag from "../components/NoIndexTag.jsx";
@@ -8,6 +8,7 @@ import { FALLBACK_CURRENCIES, formatMoney } from "../currency.js";
 
 export default function DonatePage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
   const [access, setAccess] = useState("loading"); // loading | private | passcode | ready | error
   const [passcodeError, setPasscodeError] = useState("");
   const [notFoundError, setNotFoundError] = useState("");
@@ -18,7 +19,7 @@ export default function DonatePage() {
   const [currency, setCurrency] = useState("USD");
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
-  const [status, setStatus] = useState("idle");
+  const [status, setStatus] = useState(() => searchParams.get("payment") === "success" ? "done" : "idle");
   const [error, setError] = useState("");
 
   function load(withPasscode) {
@@ -58,13 +59,14 @@ export default function DonatePage() {
     setError("");
     setStatus("loading");
     try {
-      await api.publicContribute(slug, {
+      const result = await api.publicContribute(slug, {
         contributorName: name || "Anonymous",
         amount: Number(amount),
         currency,
         message,
       }, passcode);
-      setStatus("done");
+      if (result.checkoutUrl) window.location.assign(result.checkoutUrl);
+      else setStatus("done");
     } catch (err) {
       setError(err.message);
       setStatus("idle");

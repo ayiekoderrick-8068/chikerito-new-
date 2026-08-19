@@ -286,6 +286,17 @@ describe("POST /api/auth/sessions/revoke-others", () => {
   });
 });
 
+describe("POST /api/auth/logout", () => {
+  beforeEach(() => freshDatabase());
+  afterAll(() => cleanupDatabases());
+
+  it("revokes the current token server-side", async () => {
+    const { headers } = await registerUser();
+    expect((await api().post("/api/auth/logout").set(headers)).status).toBe(204);
+    expect((await api().get("/api/auth/me").set(headers)).status).toBe(401);
+  });
+});
+
 describe("existing RBAC/auth behavior still holds under session tracking", () => {
   beforeEach(() => freshDatabase());
   afterAll(() => cleanupDatabases());

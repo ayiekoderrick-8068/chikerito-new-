@@ -33,10 +33,8 @@ To stop, press `Ctrl+C` once — it shuts down both processes.
 - **backend/** — Node/Express REST API
   - JWT auth (register/login)
   - Life Spaces (milestones), Budget Categories, Expenses, Contributions, Tasks, Team members, Notifications
-  - `schema.sql` documents the intended relational schema (Postgres/MySQL-ready)
-  - `db.js` implements that schema with a zero-dependency JSON file store, so the project
-    runs instantly with no database server or native build step. Swap `db.js` for a real
-    driver (pg, mysql2, Prisma, etc.) against `schema.sql` when you're ready for production.
+  - PostgreSQL-backed production persistence, migrations, and a one-time JSON importer
+  - `db.js` remains the zero-service development/test store; production requires `DATABASE_URL`
   - `seed.js` — seeds a demo account and the "Clinton & Mary's Wedding Fund" example data
 - **frontend/** — React 18 + Vite SPA
   - Public marketing site (Landing page: hero, templates, features, how it works, pricing, FAQ)
@@ -89,18 +87,29 @@ cd backend && npm start          # serve the API, and host dist/ behind any stat
 
 ## What's a scaffold vs. production-ready
 
-This is a functional MVP you (or a dev team) can extend — it is **not** wired to real payment
-processors or file storage. Specifically:
+Production uses PostgreSQL and Stripe Checkout. Public donations are counted only after a
+signed `checkout.session.completed` webhook reports a paid session. Auth tokens are tied to
+revocable server-side sessions, and password recovery is delivered through a configurable
+HTTPS mail-service endpoint.
 
-- Contributions are recorded directly (no Stripe/PayPal integration) — wire a payment
-  provider's webhook into `routes/contributions.js` to record real charges.
-- Receipt/invoice "uploads" are stored as filenames, not real files — wire in S3 or similar
-  in `routes/expenses.js`.
-- The JSON datastore (`db.js`) is for local development. Migrate to Postgres/MySQL using
-  `schema.sql` before going to production, and add connection pooling, migrations, and backups.
-- Auth is JWT-only with no email verification or password reset — add both before launch.
-- The AI Builder / AI Finance Assistant described in the product spec are not implemented —
-  they would call an LLM API and are a natural next milestone.
+Receipt and invoice fields are references only; the current UI does not upload file bytes, so
+object storage is not part of the launch scope. AI Builder and AI Finance Assistant remain
+future enhancements and are not required to operate the current product.
+
+## Production deployment
+
+1. Copy `.env.example` into your secret manager and set every variable marked as required.
+2. Install dependencies with `npm ci` in `backend/` and `frontend/`.
+3. Run `npm run db:migrate --prefix backend` against an empty PostgreSQL database.
+4. If upgrading an existing JSON deployment, back it up and run
+   `npm run db:import-json --prefix backend -- /absolute/path/to/db.json` once.
+5. Configure Stripe to send signed webhooks to `/api/payments/stripe/webhook`.
+6. Build the frontend with `npm run build --prefix frontend`, then start the API.
+
+The PostgreSQL adapter serializes mutations with a transaction-level advisory lock, preserving
+the existing domain behavior without lost updates. Horizontal API replicas are safe, though
+the whole-state transaction model is intended for the current MVP scale and should be profiled
+before high-volume use.
 
 ## Project structure
 
