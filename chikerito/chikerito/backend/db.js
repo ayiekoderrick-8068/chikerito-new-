@@ -26,6 +26,7 @@ const EMPTY = {
   budget_scenarios: [],
   budget_scenario_adjustments: [],
   tasks: [],
+  task_dependencies: [],
   notifications: [],
   notification_user_states: [],
   audit_logs: [],

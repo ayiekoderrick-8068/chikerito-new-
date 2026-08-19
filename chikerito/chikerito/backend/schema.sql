@@ -168,7 +168,17 @@ CREATE TABLE tasks (
   due_date      DATE,
   completed     BOOLEAN DEFAULT false,
   notes         TEXT,
+  parent_task_id UUID REFERENCES tasks(id) NULL,
   created_at    TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE task_dependencies (
+  id                 UUID PRIMARY KEY,
+  life_space_id      UUID REFERENCES life_spaces(id),
+  task_id            UUID REFERENCES tasks(id),
+  dependency_task_id UUID REFERENCES tasks(id),
+  created_at         TIMESTAMP DEFAULT now(),
+  UNIQUE (task_id, dependency_task_id)
 );
 
 CREATE TABLE notifications (
