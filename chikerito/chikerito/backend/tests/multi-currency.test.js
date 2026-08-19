@@ -2,6 +2,7 @@ const db = require("../db");
 const {
   SUPPORTED_CURRENCIES,
   currencyCode,
+  exchangeRateFor,
   roundForCurrency,
   normalizeTransaction,
   baseAmount,
@@ -66,22 +67,20 @@ describe("currency domain", () => {
     });
   });
 
-  it("normalizes a foreign transaction with an explicit rate", () => {
+  it("normalizes a foreign transaction with the server-owned rate", () => {
     expect(normalizeTransaction({ amount: 10, currency: "EUR", exchangeRate: 1.234 }, { currency: "USD" })).toEqual({
-      originalAmount: 10, currency: "EUR", exchangeRate: 1.234, baseAmount: 12.34, baseCurrency: "USD",
+      originalAmount: 10, currency: "EUR", exchangeRate: 1.25, baseAmount: 12.5, baseCurrency: "USD",
     });
   });
 
-  it("requires a rate for foreign currency", () => {
-    expect(normalizeTransaction({ amount: 10, currency: "EUR" }, { currency: "USD" }).error).toMatch(/required/i);
+  it("derives cross-rates from the server reference table", () => {
+    expect(exchangeRateFor("USD", "KES")).toBeCloseTo(129.87012987);
   });
 
-  it("rejects a non-unit rate for base currency", () => {
-    expect(normalizeTransaction({ amount: 10, currency: "USD", exchangeRate: 2 }, { currency: "USD" }).error).toMatch(/must be 1/i);
-  });
-
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("rejects invalid exchange rate %s", (exchangeRate) => {
-    expect(normalizeTransaction({ amount: 10, currency: "EUR", exchangeRate }, { currency: "USD" }).error).toMatch(/positive finite/i);
+  it.each([0, -1, 999999, "manipulated"])("ignores caller-supplied exchange rate %s", (exchangeRate) => {
+    expect(normalizeTransaction({ amount: 10, currency: "EUR", exchangeRate }, { currency: "USD" })).toMatchObject({
+      exchangeRate: 1.25, baseAmount: 12.5,
+    });
   });
 
   it("treats legacy amount-only rows as base currency", () => {
@@ -196,23 +195,23 @@ describe("expense currency persistence", () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token, { currency: "USD", visibility: "private" });
     const expense = await createExpense(owner.token, space.id, { amount: 100, currency: "EUR", exchangeRate: 1.075 });
-    expect(expense).toEqual(expect.objectContaining({ amount: 100, original_amount: 100, currency: "EUR", exchange_rate: 1.075, base_amount: 107.5, base_currency: "USD" }));
-    expect(expense.money).toEqual(expect.objectContaining({ originalAmount: 100, baseAmount: 107.5, converted: true }));
+    expect(expense).toEqual(expect.objectContaining({ amount: 100, original_amount: 100, currency: "EUR", exchange_rate: 1.25, base_amount: 125, base_currency: "USD" }));
+    expect(expense.money).toEqual(expect.objectContaining({ originalAmount: 100, baseAmount: 125, converted: true }));
   });
 
   it("rounds converted expense amounts deterministically", async () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token, { visibility: "private" });
     const expense = await createExpense(owner.token, space.id, { amount: 10.01, currency: "EUR", exchangeRate: 1.2345 });
-    expect(expense.base_amount).toBe(12.36);
+    expect(expense.base_amount).toBe(12.51);
   });
 
-  it("rejects foreign expense without a rate", async () => {
+  it("accepts foreign expense without a client rate", async () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token, { visibility: "private" });
     const response = await api().post(`/api/lifespaces/${space.id}/expenses`).set(auth(owner.token)).send({ vendor: "Foreign", amount: 10, currency: "EUR" });
-    expect(response.status).toBe(400);
-    expect(response.body.error).toMatch(/exchangeRate is required/i);
+    expect(response.status).toBe(201);
+    expect(response.body.expense).toMatchObject({ exchange_rate: 1.25, base_amount: 12.5 });
   });
 
   it("rejects unsupported expense currency", async () => {
@@ -228,7 +227,7 @@ describe("expense currency persistence", () => {
     const space = await createLifeSpace(owner.token, { visibility: "private" });
     await createExpense(owner.token, space.id, { amount: 20, currency: "GBP", exchangeRate: 1.25 });
     const list = await api().get(`/api/lifespaces/${space.id}/expenses`).set(auth(owner.token));
-    expect(list.body.expenses[0].money).toEqual(expect.objectContaining({ exchangeRate: 1.25, baseAmount: 25 }));
+    expect(list.body.expenses[0].money).toEqual(expect.objectContaining({ exchangeRate: 1.3, baseAmount: 26 }));
   });
 
   it("recalculates all monetary fields during an authorized edit", async () => {
@@ -237,7 +236,7 @@ describe("expense currency persistence", () => {
     const expense = await createExpense(owner.token, space.id, { amount: 20 });
     const response = await api().patch(`/api/expenses/${expense.id}`).set(auth(owner.token)).send({ amount: 30, currency: "EUR", exchangeRate: 1.2 });
     expect(response.status).toBe(200);
-    expect(response.body.expense).toEqual(expect.objectContaining({ amount: 30, currency: "EUR", exchange_rate: 1.2, base_amount: 36 }));
+    expect(response.body.expense).toEqual(expect.objectContaining({ amount: 30, currency: "EUR", exchange_rate: 1.25, base_amount: 37.5 }));
   });
 
   it("keeps planned-only foreign expense semantics", async () => {
@@ -245,7 +244,7 @@ describe("expense currency persistence", () => {
     const space = await createLifeSpace(owner.token, { visibility: "private" });
     const expense = await createExpense(owner.token, space.id, { amount: 0, plannedAmount: 50, currency: "EUR", exchangeRate: 1.1 });
     expect(expense.amount).toBe(0);
-    expect(expense.planned_base_amount).toBe(55);
+    expect(expense.planned_base_amount).toBe(62.5);
     expect(expense.planned_currency).toBe("EUR");
   });
 
@@ -265,7 +264,7 @@ describe("contribution and aggregate currency semantics", () => {
     const space = await createLifeSpace(owner.token, { currency: "KES", visibility: "private" });
     const response = await manualContribution(owner, space, { amount: 10, currency: "USD", exchangeRate: 130 });
     expect(response.status).toBe(201);
-    expect(response.body.contribution).toEqual(expect.objectContaining({ amount: 10, currency: "USD", exchange_rate: 130, base_amount: 1300, base_currency: "KES" }));
+    expect(response.body.contribution).toEqual(expect.objectContaining({ amount: 10, currency: "USD", exchange_rate: 129.87012987012986, base_amount: 1298.7, base_currency: "KES" }));
   });
 
   it("uses normalized amounts in mixed-currency dashboard totals", async () => {
@@ -275,7 +274,7 @@ describe("contribution and aggregate currency semantics", () => {
     await createExpense(owner.token, space.id, { amount: 10, currency: "EUR", exchangeRate: 1.5 });
     await manualContribution(owner, space, { amount: 40, currency: "GBP", exchangeRate: 1.25 });
     const response = await dashboard(owner, space);
-    expect(response.body.stats).toEqual(expect.objectContaining({ spent: 35, raised: 50, available: 15 }));
+    expect(response.body.stats).toEqual(expect.objectContaining({ spent: 32.5, raised: 52, available: 19.5 }));
   });
 
   it("uses normalized amounts in mixed-currency category totals", async () => {
@@ -285,7 +284,7 @@ describe("contribution and aggregate currency semantics", () => {
     await createExpense(owner.token, space.id, { amount: 10, currency: "EUR", exchangeRate: 2, categoryId: category.id });
     await manualContribution(owner, space, { amount: 30, currency: "GBP", exchangeRate: 2, categoryId: category.id });
     const response = await api().get(`/api/lifespaces/${space.id}/categories`).set(auth(owner.token));
-    expect(response.body.categories[0]).toEqual(expect.objectContaining({ spent: 20, raised: 60, available: 40 }));
+    expect(response.body.categories[0]).toEqual(expect.objectContaining({ spent: 12.5, raised: 39, available: 26.5 }));
   });
 
   it("uses normalized amounts in the public report", async () => {
@@ -294,7 +293,7 @@ describe("contribution and aggregate currency semantics", () => {
     await manualContribution(owner, space, { amount: 100, currency: "EUR", exchangeRate: 1.5 });
     const response = await api().get(`/api/public/lifespaces/${space.slug}/report`);
     expect(response.status).toBe(200);
-    expect(response.body.stats).toEqual(expect.objectContaining({ raised: 150, remainingGoal: 850, currency: "USD" }));
+    expect(response.body.stats).toEqual(expect.objectContaining({ raised: 125, remainingGoal: 875, currency: "USD" }));
   });
 
   it.each(["failed", "refunded", "voided", "pending"])("excludes %s foreign contributions from totals", async (status) => {
@@ -310,7 +309,7 @@ describe("contribution and aggregate currency semantics", () => {
     const space = await createLifeSpace(owner.token, { visibility: "private" });
     await manualContribution(owner, space, { amount: 100, currency: "EUR", exchangeRate: 2, status: "completed" });
     const response = await dashboard(owner, space);
-    expect(response.body.stats.raised).toBe(200);
+    expect(response.body.stats.raised).toBe(125);
   });
 
   it("rejects a contribution category from another tenant", async () => {
@@ -336,7 +335,7 @@ describe("recurring expense currency", () => {
     const owner = await registerUser();
     const space = await createLifeSpace(owner.token, { visibility: "private" });
     const rule = await createRecurringExpense(owner.token, space.id, { amount: 25, currency: "EUR", exchangeRate: 1.2 });
-    expect(rule).toEqual(expect.objectContaining({ amount: 25, currency: "EUR", exchange_rate: 1.2, base_amount: 30 }));
+    expect(rule).toEqual(expect.objectContaining({ amount: 25, currency: "EUR", exchange_rate: 1.25, base_amount: 31.25 }));
   });
 
   it("copies the rule's original and base values to generated expenses", async () => {
@@ -347,7 +346,7 @@ describe("recurring expense currency", () => {
       await createRecurringExpense(owner.token, space.id, { amount: 25, currency: "EUR", exchangeRate: 1.2, startDate: "2026-06-15" });
       await api().get(`/api/lifespaces/${space.id}/expenses`).set(auth(owner.token));
       const generated = db.table("expenses").where((expense) => expense.life_space_id === space.id)[0];
-      expect(generated).toEqual(expect.objectContaining({ amount: 25, currency: "EUR", exchange_rate: 1.2, base_amount: 30, base_currency: "USD" }));
+      expect(generated).toEqual(expect.objectContaining({ amount: 25, currency: "EUR", exchange_rate: 1.25, base_amount: 31.25, base_currency: "USD" }));
     } finally {
       jest.useRealTimers();
     }
@@ -359,8 +358,8 @@ describe("recurring expense currency", () => {
     const category = await createCategory(owner.token, space.id, { budgetAmount: 100 });
     await createRecurringExpense(owner.token, space.id, { amount: 25, currency: "EUR", exchangeRate: 2, categoryId: category.id });
     const response = await dashboard(owner, space);
-    expect(response.body.upcomingRecurringExpenses[0].baseAmount).toBe(50);
-    expect(response.body.categoryBreakdown[0].projectedSpent).toBe(50);
+    expect(response.body.upcomingRecurringExpenses[0].baseAmount).toBe(31.25);
+    expect(response.body.categoryBreakdown[0].projectedSpent).toBe(31.25);
   });
 
   it("rejects unsupported recurring currency", async () => {

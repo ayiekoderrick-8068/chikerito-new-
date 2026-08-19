@@ -9,6 +9,9 @@ function findPublicLifeSpace(slug) {
 
 function checkPublicAccess(lifeSpace, req) {
   if (!lifeSpace) return { ok: false, status: 404, body: { error: "Life space not found" } };
+  if (lifeSpace.status === "archived") {
+    return { ok: false, status: 410, body: { error: "This event is archived.", archived: true } };
+  }
   if (lifeSpace.visibility !== "public") {
     return { ok: false, status: 403, body: { error: "This event is private.", private: true } };
   }

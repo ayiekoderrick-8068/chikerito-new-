@@ -16,7 +16,6 @@ export default function DonatePage() {
 
   const [amount, setAmount] = useState(50);
   const [currency, setCurrency] = useState("USD");
-  const [exchangeRate, setExchangeRate] = useState("");
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState("idle");
@@ -59,12 +58,10 @@ export default function DonatePage() {
     setError("");
     setStatus("loading");
     try {
-      const baseCurrency = event.lifeSpace.currency || "USD";
       await api.publicContribute(slug, {
         contributorName: name || "Anonymous",
         amount: Number(amount),
         currency,
-        exchangeRate: currency === baseCurrency ? 1 : Number(exchangeRate),
         message,
       }, passcode);
       setStatus("done");
@@ -132,14 +129,10 @@ export default function DonatePage() {
                 </div>
                 <div className="field">
                   <label htmlFor="donation-currency">Currency</label>
-                  <select id="donation-currency" value={currency} onChange={(e) => { setCurrency(e.target.value); setExchangeRate(""); }}>
+                  <select id="donation-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                     {FALLBACK_CURRENCIES.map((option) => <option key={option.code} value={option.code}>{option.code} — {option.name}</option>)}
                   </select>
                 </div>
-                {currency !== (event.lifeSpace.currency || "USD") && <div className="field">
-                  <label htmlFor="donation-exchange-rate">Exchange rate ({event.lifeSpace.currency || "USD"} per {currency})</label>
-                  <input id="donation-exchange-rate" type="number" min="0.000001" step="any" required value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} />
-                </div>}
                 <div className="field">
                   <label>Message (optional)</label>
                   <textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />

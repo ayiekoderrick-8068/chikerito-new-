@@ -3,7 +3,7 @@ const { v4: uuid } = require("uuid");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const { requireMember, requireCapability, requireResourceCapability } = require("../middleware/authorize");
-const { FREQUENCIES, nextOccurrence, runDueOccurrences } = require("../recurrence");
+const { FREQUENCIES, nextOccurrenceWithExceptions, runDueOccurrences } = require("../recurrence");
 const { normalizeTransaction, monetaryFields, transactionView } = require("../currency");
 
 const router = express.Router();
@@ -38,7 +38,7 @@ function validateCreateOrUpdate(body, { partial = false } = {}) {
 }
 
 function serialize(recurring, baseCurrency = "USD") {
-  return { ...recurring, nextOccurrence: nextOccurrence(recurring), money: transactionView(recurring, baseCurrency) };
+  return { ...recurring, nextOccurrence: nextOccurrenceWithExceptions(recurring), money: transactionView(recurring, baseCurrency) };
 }
 
 router.get("/lifespaces/:lifeSpaceId/recurring-expenses", requireAuth, requireMember("lifeSpaceId"), (req, res) => {
@@ -54,12 +54,12 @@ router.post("/lifespaces/:lifeSpaceId/recurring-expenses", requireAuth, requireC
   const error = validateCreateOrUpdate(req.body);
   if (error) return res.status(400).json({ error });
 
-  const { categoryId, vendor, amount, currency, exchangeRate, frequency, startDate, endDate } = req.body;
+  const { categoryId, vendor, amount, currency, frequency, startDate, endDate } = req.body;
   if (categoryId) {
     const category = db.table("budget_categories").find(categoryId);
     if (!category || category.life_space_id !== req.lifeSpace.id) return res.status(400).json({ error: "categoryId must belong to this life space" });
   }
-  const normalized = normalizeTransaction({ amount, currency, exchangeRate }, req.lifeSpace);
+  const normalized = normalizeTransaction({ amount, currency }, req.lifeSpace);
   if (normalized.error) return res.status(400).json({ error: normalized.error });
   const rule = db.table("recurring_expenses").insert({
     id: uuid(),
@@ -102,12 +102,11 @@ router.patch(
       const category = db.table("budget_categories").find(req.body.categoryId);
       if (!category || category.life_space_id !== lifeSpace.id) return res.status(400).json({ error: "categoryId must belong to this life space" });
     }
-    if (["amount", "currency", "exchangeRate"].some((key) => req.body[key] !== undefined)) {
+    if (["amount", "currency"].some((key) => req.body[key] !== undefined)) {
       const existing = transactionView(req.resource, lifeSpace.currency);
       const normalized = normalizeTransaction({
         amount: req.body.amount ?? existing.originalAmount,
         currency: req.body.currency ?? existing.currency,
-        exchangeRate: req.body.exchangeRate ?? existing.exchangeRate,
       }, lifeSpace);
       if (normalized.error) return res.status(400).json({ error: normalized.error });
       patch.amount = normalized.originalAmount;

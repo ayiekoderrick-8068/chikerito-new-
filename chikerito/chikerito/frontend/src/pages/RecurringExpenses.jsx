@@ -13,7 +13,7 @@ function todayStr() {
 }
 
 function emptyForm(baseCurrency = "USD") {
-  return { vendor: "", amount: "", currency: baseCurrency, exchangeRate: "", categoryId: "", frequency: "monthly", startDate: todayStr(), endDate: "" };
+  return { vendor: "", amount: "", currency: baseCurrency, categoryId: "", frequency: "monthly", startDate: todayStr(), endDate: "" };
 }
 
 export default function RecurringExpenses() {
@@ -68,7 +68,6 @@ export default function RecurringExpenses() {
       vendor: rule.vendor,
       amount: rule.amount,
       currency: money.currency,
-      exchangeRate: money.exchangeRate,
       categoryId: rule.category_id || "",
       frequency: rule.frequency,
       startDate: rule.start_date,
@@ -87,7 +86,6 @@ export default function RecurringExpenses() {
         vendor: form.vendor,
         amount: form.amount,
         currency: form.currency,
-        exchangeRate: form.currency === baseCurrency ? 1 : form.exchangeRate,
         categoryId: form.categoryId || null,
         frequency: form.frequency,
         startDate: form.startDate,
@@ -95,7 +93,7 @@ export default function RecurringExpenses() {
       };
       if (editing) {
         // start/end/frequency are set once at creation — editing only touches the rest.
-        await api.updateRecurringExpense(editing.id, { vendor: payload.vendor, amount: payload.amount, currency: payload.currency, exchangeRate: payload.exchangeRate, categoryId: payload.categoryId, frequency: payload.frequency });
+        await api.updateRecurringExpense(editing.id, { vendor: payload.vendor, amount: payload.amount, currency: payload.currency, categoryId: payload.categoryId, frequency: payload.frequency });
       } else {
         await api.createRecurringExpense(currentId, payload);
       }
@@ -240,15 +238,10 @@ export default function RecurringExpenses() {
               </div>
               <div className="field">
                 <label htmlFor="recurring-currency">Currency</label>
-                <select id="recurring-currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value, exchangeRate: e.target.value === baseCurrency ? "1" : "" })}>
+                <select id="recurring-currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
                   {FALLBACK_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}
                 </select>
               </div>
-              {form.currency !== baseCurrency && <div className="field">
-                <label htmlFor="recurring-exchange-rate">Exchange rate ({baseCurrency} per {form.currency})</label>
-                <input id="recurring-exchange-rate" type="number" min="0.000001" step="any" required value={form.exchangeRate} onChange={(e) => setForm({ ...form, exchangeRate: e.target.value })} />
-                <small className="currency-help">Generated expenses preserve this rate snapshot.</small>
-              </div>}
               <div className="field">
                 <label>Frequency</label>
                 <select value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })}>

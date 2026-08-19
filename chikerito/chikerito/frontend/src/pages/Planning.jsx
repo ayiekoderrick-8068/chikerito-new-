@@ -35,27 +35,35 @@ function relativeLabel(dateStr) {
 }
 
 function emptyForm() {
-  return { title: "", category: "General", dueDate: "", notes: "", priority: "medium" };
+  return { title: "", category: "General", dueDate: "", notes: "", priority: "medium", parentTaskId: "", dependencyIds: [] };
 }
 
-function TaskRow({ task, onToggle, onDelete, onEdit, canManage }) {
+function TaskRow({ task, taskById, onToggle, onDelete, onEdit, onAddSubtask, canManage }) {
   const overdue = !task.completed && task.due_date && task.due_date < todayStr();
+  const parent = task.parent_task_id ? taskById.get(task.parent_task_id) : null;
   return (
-    <li className={`task-row ${task.completed ? "completed" : ""}`}>
+    <li className={`task-row task-depth-${Math.min(task.depth || 0, 3)} ${task.completed ? "completed" : ""} ${task.blocked ? "blocked" : ""}`}>
       <label className="task-checkbox-label">
-        <input type="checkbox" checked={task.completed} disabled={!canManage} onChange={() => canManage && onToggle(task)} />
-        <span className="task-title">{task.title}</span>
+        <input type="checkbox" checked={task.completed} disabled={!canManage || task.blocked} aria-label={`Complete ${task.title}`} onChange={() => canManage && !task.blocked && onToggle(task)} />
+        <span className="task-title-wrap"><span className="task-title">{task.title}</span>{parent && <small>Subtask of {parent.title}</small>}</span>
       </label>
       <span className="category-badge">{task.category}</span>
       <span className={`priority-badge ${PRIORITY_CLASS[task.priority] || PRIORITY_CLASS.medium}`}>
         {PRIORITY_LABEL[task.priority] || "Medium"}
       </span>
       {task.due_date && <span className={`relative-date ${overdue ? "overdue" : ""}`}>{relativeLabel(task.due_date)}</span>}
+      {task.blocked && <span className="blocked-badge" title={task.blockers?.map((item) => item.title).join(", ")}>Blocked</span>}
+      {task.dependencies?.length > 0 && <span className="dependency-summary">Depends on {task.dependencies.map((item) => item.title).join(", ")}</span>}
+      {task.unlocks_count > 0 && <span className="dependency-summary">Unlocks {task.unlocks_count} task{task.unlocks_count === 1 ? "" : "s"}</span>}
+      {task.subtask_progress?.total > 0 && <span className="subtask-progress" aria-label={`${task.title} subtask progress`}>
+        {task.subtask_progress.completed}/{task.subtask_progress.total} subtasks · {task.subtask_progress.percent}%
+      </span>}
       {canManage && (
-        <>
+        <span className="task-actions">
+          <button className="btn btn-ghost btn-sm" onClick={() => onAddSubtask(task)}>+ Subtask</button>
           <button className="btn btn-ghost btn-sm" onClick={() => onEdit(task)}>Edit</button>
-          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => onDelete(task.id)}>✕</button>
-        </>
+          <button className="btn btn-ghost btn-sm" title={`Delete ${task.title}`} style={{ color: "var(--danger)" }} onClick={() => onDelete(task.id)}>✕</button>
+        </span>
       )}
     </li>
   );
@@ -66,6 +74,7 @@ export default function Planning() {
   const canManage = can(current?.role, "task:manage");
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [toggleError, setToggleError] = useState("");
   const [view, setView] = useState("timeline");
 
@@ -83,9 +92,15 @@ export default function Planning() {
   async function load() {
     if (!currentId) return;
     setLoading(true);
-    const { tasks } = await api.listTasks(currentId);
-    setTasks(tasks);
-    setLoading(false);
+    setLoadError("");
+    try {
+      const result = await api.listTasks(currentId);
+      setTasks(result.tasks);
+    } catch (err) {
+      setLoadError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -109,8 +124,13 @@ export default function Planning() {
 
   async function handleDelete(id) {
     if (!confirm("Delete this task?")) return;
-    await api.deleteTask(id);
-    await load();
+    setToggleError("");
+    try {
+      await api.deleteTask(id);
+      await load();
+    } catch (err) {
+      setToggleError(`Could not delete task: ${err.message}`);
+    }
   }
 
   function openEdit(task) {
@@ -121,8 +141,22 @@ export default function Planning() {
       dueDate: task.due_date || "",
       notes: task.notes || "",
       priority: task.priority || "medium",
+      parentTaskId: task.parent_task_id || "",
+      dependencyIds: task.dependency_ids || [],
     });
     setEditError("");
+  }
+
+  function openSubtask(parent) {
+    setCreateForm({ ...emptyForm(), category: parent.category, parentTaskId: parent.id });
+    setShowCreate(true);
+  }
+
+  async function syncDependencies(taskId, existingIds, wantedIds) {
+    const existing = [...new Set(existingIds || [])].sort();
+    const wanted = [...new Set(wantedIds || [])].sort();
+    if (existing.length === wanted.length && existing.every((id, index) => id === wanted[index])) return;
+    await api.replaceTaskDependencies(taskId, wanted);
   }
 
   async function handleEditSubmit(e) {
@@ -137,7 +171,9 @@ export default function Planning() {
         dueDate: editForm.dueDate || null,
         notes: editForm.notes,
         priority: editForm.priority,
+        parentTaskId: editForm.parentTaskId || null,
       });
+      await syncDependencies(editingTask.id, editingTask.dependency_ids, editForm.dependencyIds);
       setEditingTask(null);
       await load();
     } catch (err) {
@@ -150,11 +186,16 @@ export default function Planning() {
   async function handleCreate(e) {
     e.preventDefault();
     setSaving(true);
+    setToggleError("");
     try {
-      await api.createTask(currentId, createForm);
-      setCreateForm({ title: "", category: createForm.category, dueDate: "", notes: "", priority: "medium" });
+      const { dependencyIds, ...payload } = createForm;
+      const result = await api.createTask(currentId, { ...payload, parentTaskId: payload.parentTaskId || null });
+      await syncDependencies(result.task.id, [], dependencyIds);
+      setCreateForm({ ...emptyForm(), category: createForm.category });
       setShowCreate(false);
       await load();
+    } catch (err) {
+      setToggleError(`Could not create task: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -164,8 +205,40 @@ export default function Planning() {
     const total = tasks.length;
     const done = tasks.filter((t) => t.completed).length;
     const overdue = tasks.filter((t) => !t.completed && t.due_date && t.due_date < todayStr()).length;
-    return { total, done, overdue };
+    const blocked = tasks.filter((t) => t.blocked).length;
+    const subtasks = tasks.filter((t) => t.parent_task_id).length;
+    const ready = tasks.filter((t) => !t.completed && !t.blocked).length;
+    return { total, done, overdue, blocked, subtasks, ready };
   }, [tasks]);
+
+  const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+
+  function toggleDependency(setForm, form, id) {
+    const selected = form.dependencyIds.includes(id)
+      ? form.dependencyIds.filter((item) => item !== id)
+      : [...form.dependencyIds, id];
+    setForm({ ...form, dependencyIds: selected });
+  }
+
+  function relationshipFields(form, setForm, excludedId = null) {
+    const candidates = tasks.filter((task) => task.id !== excludedId);
+    return <div className="task-relationship-fields">
+      <div className="field">
+        <label htmlFor={`${excludedId ? "edit" : "create"}-parentTaskId`}>Parent task</label>
+        <select id={`${excludedId ? "edit" : "create"}-parentTaskId`} value={form.parentTaskId} onChange={(e) => setForm({ ...form, parentTaskId: e.target.value })}>
+          <option value="">No parent task</option>
+          {candidates.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
+        </select>
+      </div>
+      <fieldset className="dependency-picker">
+        <legend>Dependencies</legend>
+        {candidates.length === 0 ? <p className="text-muted">No other tasks available.</p> : candidates.map((task) => <label key={task.id}>
+          <input type="checkbox" checked={form.dependencyIds.includes(task.id)} onChange={() => toggleDependency(setForm, form, task.id)} />
+          {task.title}{task.completed ? " (complete)" : ""}
+        </label>)}
+      </fieldset>
+    </div>;
+  }
 
   const timelineGroups = useMemo(() => {
     const dated = tasks.filter((t) => t.due_date).sort((a, b) => a.due_date.localeCompare(b.due_date));
@@ -197,13 +270,25 @@ export default function Planning() {
     <>
       <Topbar title="Event Planning" />
       <div className="page-body">
-        <div className="stat-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        <div className="stat-grid planning-stat-grid">
           <div className="stat-card"><div className="label">Tasks Complete</div><div className="value">{stats.done}/{stats.total}</div></div>
           <div className={`stat-card ${stats.overdue > 0 ? "accent" : ""}`}><div className="label">Overdue</div><div className="value">{stats.overdue}</div></div>
+          <div className={`stat-card ${stats.blocked > 0 ? "accent" : ""}`}><div className="label">Blocked</div><div className="value">{stats.blocked}</div></div>
+          <div className="stat-card"><div className="label">Subtasks</div><div className="value">{stats.subtasks}</div></div>
           <div className="stat-card"><div className="label">Progress</div><div className="value">{stats.total ? Math.round((stats.done / stats.total) * 100) : 0}%</div></div>
         </div>
 
-        {toggleError && <div className="error-banner" style={{ margin: "12px 0" }}>{toggleError}</div>}
+        {!loading && tasks.length > 0 && <section className="graph-summary card" aria-label="Task graph summary">
+          <strong>{stats.ready}</strong> ready to work on
+          <span aria-hidden="true">·</span>
+          <strong>{stats.blocked}</strong> waiting on dependencies
+          <span aria-hidden="true">·</span>
+          <strong>{stats.subtasks}</strong> nested subtasks
+        </section>}
+
+        {(toggleError || loadError) && <div className="error-banner" role="alert" style={{ margin: "12px 0" }}>
+          {toggleError || loadError}{loadError && <button className="btn btn-ghost btn-sm" onClick={load}>Try again</button>}
+        </div>}
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "24px 0 16px" }}>
           <div className="view-toggle">
@@ -223,7 +308,7 @@ export default function Planning() {
               <div className="card timeline-month" key={month}>
                 <h3>{monthLabel(items[0].due_date)}</h3>
                 <ul className="task-list">
-                  {items.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onEdit={openEdit} canManage={canManage} />)}
+                  {items.map((t) => <TaskRow key={t.id} task={t} taskById={taskById} onToggle={handleToggle} onDelete={handleDelete} onEdit={openEdit} onAddSubtask={openSubtask} canManage={canManage} />)}
                 </ul>
               </div>
             ))}
@@ -231,7 +316,7 @@ export default function Planning() {
               <div className="card timeline-month">
                 <h3>No due date</h3>
                 <ul className="task-list">
-                  {timelineGroups.noDate.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onEdit={openEdit} canManage={canManage} />)}
+                  {timelineGroups.noDate.map((t) => <TaskRow key={t.id} task={t} taskById={taskById} onToggle={handleToggle} onDelete={handleDelete} onEdit={openEdit} onAddSubtask={openSubtask} canManage={canManage} />)}
                 </ul>
               </div>
             )}
@@ -247,7 +332,7 @@ export default function Planning() {
                 </div>
                 <div className="progress-track"><div className="progress-fill blue" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} /></div>
                 <ul className="task-list">
-                  {items.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onEdit={openEdit} canManage={canManage} />)}
+                  {items.map((t) => <TaskRow key={t.id} task={t} taskById={taskById} onToggle={handleToggle} onDelete={handleDelete} onEdit={openEdit} onAddSubtask={openSubtask} canManage={canManage} />)}
                 </ul>
               </div>
             );
@@ -287,6 +372,7 @@ export default function Planning() {
                 <label htmlFor="edit-notes">Notes</label>
                 <textarea id="edit-notes" rows={2} value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
               </div>
+              {relationshipFields(editForm, setEditForm, editingTask.id)}
               <div className="modal-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setEditingTask(null)}>Cancel</button>
                 <button className="btn btn-primary" disabled={editSaving}>{editSaving ? "Saving..." : "Save Changes"}</button>
@@ -327,6 +413,7 @@ export default function Planning() {
                 <label htmlFor="create-notes">Notes</label>
                 <textarea id="create-notes" rows={2} value={createForm.notes} onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })} />
               </div>
+              {relationshipFields(createForm, setCreateForm)}
               <div className="modal-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setShowCreate(false)}>Cancel</button>
                 <button className="btn btn-primary" disabled={saving}>{saving ? "Saving..." : "Add Task"}</button>

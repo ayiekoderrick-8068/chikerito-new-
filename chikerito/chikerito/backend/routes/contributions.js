@@ -48,7 +48,7 @@ router.get("/lifespaces/:lifeSpaceId/contributions", requireAuth, requireMember(
 // POST /lifespaces/:id/contributions — authorized manual entry
 // ---------------------------------------------------------------------------
 router.post("/lifespaces/:lifeSpaceId/contributions", requireAuth, requireCapability("contribution:manage", "lifeSpaceId"), (req, res) => {
-  const { contributorName, amount, currency, exchangeRate, categoryId, message, paymentMethod, status, notes } = req.body;
+  const { contributorName, amount, currency, categoryId, message, paymentMethod, status, notes } = req.body;
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "A positive amount is required" });
   if (!contributorName || !contributorName.trim()) return res.status(400).json({ error: "contributorName is required" });
   const initialStatus = status || "completed";
@@ -59,7 +59,7 @@ router.post("/lifespaces/:lifeSpaceId/contributions", requireAuth, requireCapabi
     const category = db.table("budget_categories").find(categoryId);
     if (!category || category.life_space_id !== req.lifeSpace.id) return res.status(400).json({ error: "categoryId must belong to this life space" });
   }
-  const normalized = normalizeTransaction({ amount, currency, exchangeRate }, req.lifeSpace);
+  const normalized = normalizeTransaction({ amount, currency }, req.lifeSpace);
   if (normalized.error) return res.status(400).json({ error: normalized.error });
 
   const contribution = db.table("contributions").insert({
@@ -144,13 +144,13 @@ router.post("/public/lifespaces/:slug/contribute", (req, res) => {
   const lifeSpace = findPublicLifeSpace(req.params.slug);
   const access = checkPublicAccess(lifeSpace, req);
   if (!access.ok) return res.status(access.status).json(access.body);
-  const { contributorName, amount, currency, exchangeRate, categoryId, message, paymentMethod } = req.body;
+  const { contributorName, amount, currency, categoryId, message, paymentMethod } = req.body;
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "A positive amount is required" });
   if (categoryId) {
     const category = db.table("budget_categories").find(categoryId);
     if (!category || category.life_space_id !== lifeSpace.id) return res.status(400).json({ error: "categoryId must belong to this life space" });
   }
-  const normalized = normalizeTransaction({ amount, currency, exchangeRate }, lifeSpace);
+  const normalized = normalizeTransaction({ amount, currency }, lifeSpace);
   if (normalized.error) return res.status(400).json({ error: normalized.error });
 
   const contribution = db.table("contributions").insert({

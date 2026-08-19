@@ -16,10 +16,13 @@ export function LifeSpaceProvider({ children }) {
     try {
       const { lifeSpaces } = await api.listLifeSpaces();
       setLifeSpaces(lifeSpaces);
-      if (!currentId && lifeSpaces.length) {
-        setCurrentId(lifeSpaces[0].id);
-        localStorage.setItem("chikerito_current_ls", lifeSpaces[0].id);
-      }
+      setCurrentId((selectedId) => {
+        if (selectedId && lifeSpaces.some((space) => space.id === selectedId)) return selectedId;
+        const nextId = lifeSpaces[0]?.id || null;
+        if (nextId) localStorage.setItem("chikerito_current_ls", nextId);
+        else localStorage.removeItem("chikerito_current_ls");
+        return nextId;
+      });
     } finally {
       setLoading(false);
     }

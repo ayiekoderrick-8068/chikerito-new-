@@ -32,7 +32,6 @@ export default function Contributions() {
     contributorName: "",
     amount: "",
     currency: "USD",
-    exchangeRate: "",
     categoryId: "",
     message: "",
     paymentMethod: "manual",
@@ -95,7 +94,6 @@ export default function Contributions() {
         contributorName: formData.contributorName || "Anonymous",
         amount: parseFloat(formData.amount),
         currency: formData.currency,
-        exchangeRate: formData.currency === baseCurrency ? 1 : Number(formData.exchangeRate),
         categoryId: formData.categoryId || null,
         message: formData.message,
         paymentMethod: formData.paymentMethod,
@@ -110,7 +108,6 @@ export default function Contributions() {
         contributorName: "",
         amount: "",
         currency: baseCurrency,
-        exchangeRate: "",
         categoryId: "",
         message: "",
         paymentMethod: "manual",
@@ -192,7 +189,7 @@ export default function Contributions() {
               Copy Link
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => {
-              if (!showForm) setFormData((value) => ({ ...value, currency: baseCurrency, exchangeRate: "" }));
+              if (!showForm) setFormData((value) => ({ ...value, currency: baseCurrency }));
               setShowForm(!showForm);
             }}>
               {showForm ? "Cancel" : "+ Add Manually"}
@@ -236,11 +233,6 @@ export default function Contributions() {
                     {FALLBACK_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}
                   </select>
                 </div>
-                {formData.currency !== baseCurrency && <div className="field">
-                  <label htmlFor="contribution-exchange-rate">Exchange rate ({baseCurrency} per {formData.currency})</label>
-                  <input id="contribution-exchange-rate" type="number" name="exchangeRate" min="0.000001" step="any" required value={formData.exchangeRate} onChange={handleFormChange} />
-                  <small className="currency-help">The recorded rate will not change later.</small>
-                </div>}
                 <div className="field">
                   <label>Category</label>
                   <select name="categoryId" value={formData.categoryId} onChange={handleFormChange}>

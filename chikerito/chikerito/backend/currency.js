@@ -10,6 +10,19 @@ const SUPPORTED_CURRENCIES = Object.freeze([
 
 const CURRENCY_BY_CODE = new Map(SUPPORTED_CURRENCIES.map((currency) => [currency.code, currency]));
 
+// Server-owned reference values expressed as USD per currency unit. Pair
+// rates are derived from this table; request payloads never influence them.
+const USD_REFERENCE_VALUES = Object.freeze({
+  USD: 1,
+  EUR: 1.25,
+  GBP: 1.3,
+  KES: 0.0077,
+  JPY: 0.0067,
+  CAD: 0.74,
+  AUD: 0.66,
+});
+const RATE_TABLE_VERSION = "2026-08-19";
+
 function currencyCode(value, fallback = "USD") {
   const code = String(value || fallback).trim().toUpperCase();
   return CURRENCY_BY_CODE.has(code) ? code : null;
@@ -31,34 +44,24 @@ function positiveMoney(value, field = "amount") {
   return { value: number };
 }
 
-function validRate(value) {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 && number <= 1000000;
+function exchangeRateFor(transactionCurrency, baseCurrency) {
+  const transaction = currencyCode(transactionCurrency);
+  const base = currencyCode(baseCurrency);
+  if (!transaction || !base) return null;
+  return transaction === base ? 1 : USD_REFERENCE_VALUES[transaction] / USD_REFERENCE_VALUES[base];
 }
 
 // exchangeRate always means "base-currency units for one transaction-currency
 // unit". Storing this snapshot makes later calculations repeatable and keeps
 // the original transaction value intact.
-function normalizeTransaction({ amount, currency, exchangeRate }, lifeSpace, field = "amount") {
+function normalizeTransaction({ amount, currency }, lifeSpace, field = "amount") {
   const money = positiveMoney(amount, field);
   if (money.error) return money;
   const baseCurrency = currencyCode(lifeSpace?.currency) || "USD";
   const transactionCurrency = currencyCode(currency, baseCurrency);
   if (!transactionCurrency) return { error: currencyError(currency) };
 
-  let rate;
-  if (transactionCurrency === baseCurrency) {
-    if (exchangeRate !== undefined && exchangeRate !== null && exchangeRate !== "" && Number(exchangeRate) !== 1) {
-      return { error: "exchangeRate must be 1 when transaction currency equals base currency" };
-    }
-    rate = 1;
-  } else {
-    if (exchangeRate === undefined || exchangeRate === null || exchangeRate === "") {
-      return { error: "exchangeRate is required for a foreign-currency transaction" };
-    }
-    if (!validRate(exchangeRate)) return { error: "exchangeRate must be a positive finite number" };
-    rate = Number(exchangeRate);
-  }
+  const rate = exchangeRateFor(transactionCurrency, baseCurrency);
 
   const originalAmount = roundForCurrency(money.value, transactionCurrency);
   return {
@@ -113,8 +116,11 @@ function hasFinancialActivity(db, lifeSpaceId) {
 
 module.exports = {
   SUPPORTED_CURRENCIES,
+  USD_REFERENCE_VALUES,
+  RATE_TABLE_VERSION,
   currencyCode,
   currencyError,
+  exchangeRateFor,
   roundForCurrency,
   normalizeTransaction,
   monetaryFields,

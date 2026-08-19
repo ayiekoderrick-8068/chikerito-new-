@@ -86,17 +86,16 @@ describe("expense multi-currency experience", () => {
     expect(screen.queryByLabelText(/exchange rate/i)).not.toBeInTheDocument();
   });
 
-  it("requires a visible rate when foreign currency is selected", async () => {
+  it("does not expose an editable rate when foreign currency is selected", async () => {
     api.listExpenses.mockResolvedValue({ expenses: [], hasMore: false });
     renderRoute(<ExpenseTracker />);
     await screen.findByText(/no expenses recorded/i);
     await userEvent.click(screen.getByRole("button", { name: /record expense/i }));
     await userEvent.selectOptions(screen.getByLabelText("Currency"), "EUR");
-    expect(screen.getByLabelText("Exchange rate (USD per EUR)")).toBeRequired();
-    expect(screen.getByText(/rate is saved with the expense/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/exchange rate/i)).not.toBeInTheDocument();
   });
 
-  it("submits currency and rate with a foreign expense", async () => {
+  it("submits currency without a client-controlled rate", async () => {
     api.listExpenses.mockResolvedValue({ expenses: [], hasMore: false });
     api.createExpense.mockResolvedValue({ expense: {} });
     renderRoute(<ExpenseTracker />);
@@ -105,10 +104,10 @@ describe("expense multi-currency experience", () => {
     await userEvent.type(screen.getByLabelText("Vendor"), "Foreign Vendor");
     await userEvent.type(screen.getByLabelText(/Amount \(USD\)/), "10");
     await userEvent.selectOptions(screen.getByLabelText("Currency"), "EUR");
-    await userEvent.type(screen.getByLabelText("Exchange rate (USD per EUR)"), "1.25");
     await userEvent.click(screen.getByRole("button", { name: /save expense/i }));
     await waitFor(() => expect(api.createExpense).toHaveBeenCalled());
-    expect(api.createExpense.mock.calls[0][1]).toEqual(expect.objectContaining({ amount: "10", currency: "EUR", exchangeRate: "1.25" }));
+    expect(api.createExpense.mock.calls[0][1]).toEqual(expect.objectContaining({ amount: "10", currency: "EUR" }));
+    expect(api.createExpense.mock.calls[0][1]).not.toHaveProperty("exchangeRate");
   });
 
   it("hides transaction controls from read-only members", async () => {
@@ -144,7 +143,7 @@ describe("recurring and contribution currency controls", () => {
     expect(screen.getByText(/USD.*25.*at 1\.25/)).toBeInTheDocument();
   });
 
-  it("submits the recurring rate snapshot", async () => {
+  it("submits recurring currency without a client-controlled rate", async () => {
     api.createRecurringExpense.mockResolvedValue({ recurringExpense: {} });
     renderRoute(<RecurringExpenses />);
     await screen.findByText(/no recurring expenses/i);
@@ -152,10 +151,10 @@ describe("recurring and contribution currency controls", () => {
     await userEvent.type(screen.getByLabelText("Vendor"), "Euro Hosting");
     await userEvent.type(screen.getByLabelText(/Amount \(USD\)/), "15");
     await userEvent.selectOptions(screen.getByLabelText("Currency"), "EUR");
-    await userEvent.type(screen.getByLabelText("Exchange rate (USD per EUR)"), "1.1");
     await userEvent.click(screen.getByRole("button", { name: /^add recurring expense$/i }));
     await waitFor(() => expect(api.createRecurringExpense).toHaveBeenCalled());
-    expect(api.createRecurringExpense.mock.calls[0][1]).toEqual(expect.objectContaining({ currency: "EUR", exchangeRate: "1.1" }));
+    expect(api.createRecurringExpense.mock.calls[0][1]).toEqual(expect.objectContaining({ currency: "EUR" }));
+    expect(api.createRecurringExpense.mock.calls[0][1]).not.toHaveProperty("exchangeRate");
   });
 
   it("defaults the manual contribution selector to base currency", async () => {
@@ -165,12 +164,11 @@ describe("recurring and contribution currency controls", () => {
     expect(screen.getByLabelText("Currency")).toHaveValue("KES");
   });
 
-  it("reveals contribution rate help for foreign currency", async () => {
+  it("does not reveal a caller-controlled contribution rate", async () => {
     renderRoute(<Contributions />);
     await userEvent.click(await screen.findByRole("button", { name: /add manually/i }));
     await userEvent.selectOptions(screen.getByLabelText("Currency"), "EUR");
-    expect(screen.getByLabelText("Exchange rate (USD per EUR)")).toBeRequired();
-    expect(screen.getByText(/recorded rate will not change/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/exchange rate/i)).not.toBeInTheDocument();
   });
 
   it("renders contribution original and converted values", async () => {

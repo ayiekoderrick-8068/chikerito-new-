@@ -8,7 +8,7 @@ import { FALLBACK_CURRENCIES, conversionLabel, formatMoney, moneyView } from "..
 const STATUSES = ["", "paid", "pending", "overdue"];
 
 function emptyForm(baseCurrency = "USD") {
-  return { vendor: "", categoryId: "", amount: "", currency: baseCurrency, exchangeRate: "", paymentDate: "", status: "paid", notes: "", hasReceipt: false };
+  return { vendor: "", categoryId: "", amount: "", currency: baseCurrency, paymentDate: "", status: "paid", notes: "", hasReceipt: false };
 }
 
 export default function ExpenseTracker() {
@@ -102,7 +102,6 @@ export default function ExpenseTracker() {
       categoryId: expense.category_id || "",
       amount: expense.amount,
       currency: money.currency,
-      exchangeRate: money.exchangeRate,
       paymentDate: expense.payment_date || "",
       status: expense.status,
       notes: expense.notes || "",
@@ -124,7 +123,6 @@ export default function ExpenseTracker() {
         categoryId: form.categoryId || null,
         amount: form.amount,
         currency: form.currency,
-        exchangeRate: form.currency === baseCurrency ? 1 : form.exchangeRate,
         paymentDate: form.paymentDate,
         status: form.status,
         notes: form.notes,
@@ -288,15 +286,10 @@ export default function ExpenseTracker() {
               </div>
               <div className="field">
                 <label htmlFor="expense-currency">Currency</label>
-                <select id="expense-currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value, exchangeRate: e.target.value === baseCurrency ? "1" : "" })}>
+                <select id="expense-currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
                   {FALLBACK_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}
                 </select>
               </div>
-              {form.currency !== baseCurrency && <div className="field">
-                <label htmlFor="expense-exchange-rate">Exchange rate ({baseCurrency} per {form.currency})</label>
-                <input id="expense-exchange-rate" type="number" min="0.000001" step="any" required value={form.exchangeRate} onChange={(e) => setForm({ ...form, exchangeRate: e.target.value })} />
-                <small className="currency-help">This rate is saved with the expense.</small>
-              </div>}
               <div className="field">
                 <label>Payment date</label>
                 <input type="date" value={form.paymentDate} onChange={(e) => setForm({ ...form, paymentDate: e.target.value })} />
