@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useLifeSpace } from "../context/LifeSpaceContext.jsx";
 import { api } from "../api";
 import Topbar from "../components/Topbar.jsx";
+import { can } from "../permissions.js";
 
 export default function FinanceHub() {
-  const { currentId } = useLifeSpace();
+  const { currentId, current } = useLifeSpace();
+  const canManage = can(current?.role, "category:manage");
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -73,7 +75,7 @@ export default function FinanceHub() {
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "24px 0 16px" }}>
           <h3 style={{ margin: 0, color: "var(--navy)" }}>Budget Categories</h3>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Add Category</button>
+          {canManage && <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Add Category</button>}
         </div>
 
         {loading ? (
@@ -86,7 +88,9 @@ export default function FinanceHub() {
               <div className="card category-card" key={c.id}>
                 <div className="cat-head">
                   <span className="cat-name">{c.name}</span>
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(c.id)} style={{ color: "var(--danger)" }}>✕</button>
+                  {canManage && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(c.id)} style={{ color: "var(--danger)" }}>✕</button>
+                  )}
                 </div>
                 <div className="progress-track"><div className="progress-fill" style={{ width: `${c.progress}%` }} /></div>
                 <div className="cat-figures">

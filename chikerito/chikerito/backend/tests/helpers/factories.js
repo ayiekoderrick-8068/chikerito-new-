@@ -1,0 +1,228 @@
+const request = require("supertest");
+const { v4: uuid } = require("uuid");
+const { createApp } = require("../../app");
+const db = require("../../db");
+
+let seq = 0;
+function unique(prefix) {
+  seq += 1;
+  return `${prefix}${seq}`;
+}
+
+// A fresh supertest agent bound to a newly-built app instance.
+function api() {
+  return request(createApp());
+}
+
+function auth(token) {
+  return { Authorization: `Bearer ${token}` };
+}
+
+// Register a user and return { token, user, headers }.
+async function registerUser(overrides = {}) {
+  const payload = {
+    firstName: "Test",
+    lastName: "User",
+    email: `${unique("user")}@chikerito.test`,
+    password: "chikerito123",
+    ...overrides,
+  };
+  const res = await api().post("/api/auth/register").send(payload);
+  if (res.status !== 201) {
+    throw new Error(`registerUser failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return {
+    token: res.body.token,
+    user: res.body.user,
+    password: payload.password,
+    headers: auth(res.body.token),
+  };
+}
+
+async function loginUser(email, password) {
+  return api().post("/api/auth/login").send({ email, password });
+}
+
+// Defaults to public: the current app gates the public /contribute endpoint on
+// visibility (life spaces are created private, with no way to request public at
+// creation time — POST /lifespaces doesn't even read a visibility field, only
+// PATCH does), a check that didn't exist when these factories were first
+// written. Scenarios built here exist to test unrelated behavior
+// (categories/expenses/dashboard math), not the visibility gate itself, so a
+// follow-up PATCH to public preserves the original intent — pass
+// `visibility: "private"` in overrides where a test needs to stay private.
+async function createLifeSpace(token, overrides = {}) {
+  const { visibility = "public", ...rest } = overrides;
+  const payload = {
+    title: unique("Wedding Fund "),
+    milestoneType: "wedding",
+    story: "A story about the day.",
+    goalAmount: 10000,
+    currency: "USD",
+    ...rest,
+  };
+  const res = await api().post("/api/lifespaces").set(auth(token)).send(payload);
+  if (res.status !== 201) {
+    throw new Error(`createLifeSpace failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  let lifeSpace = res.body.lifeSpace;
+  if (visibility !== lifeSpace.visibility) {
+    const patchRes = await api()
+      .patch(`/api/lifespaces/${lifeSpace.id}`)
+      .set(auth(token))
+      .send({ visibility });
+    if (patchRes.status !== 200) {
+      throw new Error(`createLifeSpace visibility patch failed (${patchRes.status}): ${JSON.stringify(patchRes.body)}`);
+    }
+    lifeSpace = patchRes.body.lifeSpace;
+  }
+  return lifeSpace;
+}
+
+async function createCategory(token, lifeSpaceId, overrides = {}) {
+  const payload = { name: unique("Venue "), icon: "sparkles", budgetAmount: 2000, ...overrides };
+  const res = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/categories`)
+    .set(auth(token))
+    .send(payload);
+  if (res.status !== 201) {
+    throw new Error(`createCategory failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return res.body.category;
+}
+
+async function createExpense(token, lifeSpaceId, overrides = {}) {
+  const payload = { vendor: unique("Vendor "), amount: 250, ...overrides };
+  const res = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/expenses`)
+    .set(auth(token))
+    .send(payload);
+  if (res.status !== 201) {
+    throw new Error(`createExpense failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return res.body.expense;
+}
+
+// Drives the real invite -> accept lifecycle rather than granting membership
+// directly, since that's how it actually works now. `invitee` is a full
+// registered-user object (as returned by registerUser()) — accepting needs
+// their own token, not just their email.
+// Defaults startDate to tomorrow (relative to real time) so a bare call
+// never has anything due yet — tests that care about generation set
+// startDate/endDate explicitly, usually alongside jest fake timers for a
+// fixed "today".
+async function createRecurringExpense(token, lifeSpaceId, overrides = {}) {
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const payload = { vendor: unique("Recurring Vendor "), amount: 100, frequency: "monthly", startDate: tomorrow, ...overrides };
+  const res = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/recurring-expenses`)
+    .set(auth(token))
+    .send(payload);
+  if (res.status !== 201) {
+    throw new Error(`createRecurringExpense failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return res.body.recurringExpense;
+}
+
+async function addTeamMember(ownerToken, lifeSpaceId, invitee, role) {
+  const inviteRes = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/invitations`)
+    .set(auth(ownerToken))
+    .send({ email: invitee.user.email, role });
+  if (inviteRes.status !== 201) {
+    throw new Error(`addTeamMember invite failed (${inviteRes.status}): ${JSON.stringify(inviteRes.body)}`);
+  }
+  const acceptRes = await api()
+    .post(`/api/invitations/${inviteRes.body.invitation.id}/accept`)
+    .set(auth(invitee.token));
+  if (acceptRes.status !== 200) {
+    throw new Error(`addTeamMember accept failed (${acceptRes.status}): ${JSON.stringify(acceptRes.body)}`);
+  }
+  const team = await api().get(`/api/lifespaces/${lifeSpaceId}/team`).set(auth(ownerToken));
+  return team.body.team.find((m) => m.user_id === invitee.user.id);
+}
+
+async function createTask(token, lifeSpaceId, overrides = {}) {
+  const payload = { title: unique("Task "), priority: "medium", ...overrides };
+  const res = await api()
+    .post(`/api/lifespaces/${lifeSpaceId}/tasks`)
+    .set(auth(token))
+    .send(payload);
+  if (res.status !== 201) {
+    throw new Error(`createTask failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return res.body.task;
+}
+
+// Direct insert, not through the API — for precisely-timed/ordered
+// notification fixtures that the product's own notification-producing
+// actions (expense/contribution routes) don't give predictable control over.
+function createNotification(lifeSpaceId, overrides = {}) {
+  return db.table("notifications").insert({
+    id: uuid(),
+    life_space_id: lifeSpaceId,
+    type: "donation",
+    message: unique("Test notification "),
+    read: false,
+    created_at: new Date().toISOString(),
+    ...overrides,
+  });
+}
+
+async function contribute(slug, overrides = {}) {
+  const payload = { contributorName: "Aunt Mary", amount: 100, ...overrides };
+  const res = await api().post(`/api/public/lifespaces/${slug}/contribute`).send(payload);
+  return res;
+}
+
+async function createContribution(slug, overrides = {}) {
+  const res = await contribute(slug, overrides);
+  if (res.status !== 201) {
+    throw new Error(`createContribution failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
+  return res.body.contribution;
+}
+
+// A fully-populated life space: owner, two categories, an expense and a contribution.
+async function seedScenario() {
+  const owner = await registerUser();
+  const lifeSpace = await createLifeSpace(owner.token, { goalAmount: 10000 });
+  const venue = await createCategory(owner.token, lifeSpace.id, {
+    name: "Venue",
+    budgetAmount: 4000,
+  });
+  const catering = await createCategory(owner.token, lifeSpace.id, {
+    name: "Catering",
+    budgetAmount: 2000,
+  });
+  const contribution = await createContribution(lifeSpace.slug, {
+    amount: 1500,
+    categoryId: venue.id,
+  });
+  const expense = await createExpense(owner.token, lifeSpace.id, {
+    vendor: "Grand Hall",
+    amount: 900,
+    categoryId: venue.id,
+    receiptUrl: "receipt-001.pdf",
+    paymentDate: "2026-03-14",
+  });
+  return { owner, lifeSpace, venue, catering, contribution, expense };
+}
+
+module.exports = {
+  api,
+  auth,
+  unique,
+  registerUser,
+  loginUser,
+  createLifeSpace,
+  createCategory,
+  createExpense,
+  createRecurringExpense,
+  createTask,
+  addTeamMember,
+  createNotification,
+  contribute,
+  createContribution,
+  seedScenario,
+};

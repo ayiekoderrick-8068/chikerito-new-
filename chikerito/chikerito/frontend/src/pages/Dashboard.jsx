@@ -55,7 +55,7 @@ export default function Dashboard() {
     );
   }
 
-  const { stats, categoryBreakdown, financialHealth, notifications, recentContributions } = data;
+  const { stats, categoryBreakdown, financialHealth, upcomingRecurringExpenses, notifications, recentContributions } = data;
   const pieData = categoryBreakdown.filter((c) => c.spent > 0).map((c) => ({ name: c.name, value: c.spent }));
 
   return (
@@ -115,7 +115,40 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="two-col" style={{ marginTop: 24 }}>
+        <div className="card" style={{ marginBottom: 24, marginTop: 24 }}>
+          <h3 style={{ marginTop: 0 }}>Upcoming Recurring Expenses</h3>
+          {upcomingRecurringExpenses && upcomingRecurringExpenses.length === 0 ? (
+            <p style={{ color: "var(--text-muted)" }}>No upcoming recurring expenses scheduled.</p>
+          ) : !upcomingRecurringExpenses ? (
+            <p style={{ color: "var(--text-muted)" }}>Loading...</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr><th>Due Date</th><th>Vendor</th><th>Category</th><th>Amount</th></tr>
+              </thead>
+              <tbody>
+                {upcomingRecurringExpenses.map((r, i) => {
+                  const category = categoryBreakdown.find((c) => c.id === r.categoryId);
+                  return (
+                    <tr key={`${r.recurringExpenseId}-${i}`}>
+                      <td>{new Date(`${r.dueDate}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: "UTC" })}</td>
+                      <td>{r.vendor}</td>
+                      <td>{r.category || category?.name || "—"}</td>
+                      <td>${r.amount.toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {financialHealth?.projectedOver?.length > 0 && (
+            <div style={{ marginTop: 12, padding: "12px", backgroundColor: "#fff3cd", borderRadius: "6px", fontSize: 13 }}>
+              <strong>Budget Alert:</strong> {financialHealth.projectedOver.map((c) => c.name).join(", ")} will likely exceed budget after upcoming expenses.
+            </div>
+          )}
+        </div>
+
+        <div className="two-col" style={{ marginTop: 0 }}>
           <div className="card">
             <h3 style={{ marginTop: 0 }}>Recent Contributions</h3>
             {recentContributions.length === 0 ? (
@@ -144,7 +177,7 @@ export default function Dashboard() {
             ) : (
               notifications.map((n) => (
                 <div className="notif-item" key={n.id}>
-                  <span>{n.type === "milestone_funded" ? "🏆" : n.type === "budget_warning" ? "⚠️" : n.type === "donation" ? "💛" : "🧾"}</span>
+                  <span>{n.type === "milestone_funded" ? "🏆" : n.type === "budget_warning" ? "⚠️" : n.type === "donation" ? "💛" : n.type === "team_joined" ? "🤝" : "🧾"}</span>
                   <span>{n.message}</span>
                 </div>
               ))

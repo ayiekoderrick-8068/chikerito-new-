@@ -3,14 +3,10 @@ const { v4: uuid } = require("uuid");
 const bcrypt = require("bcryptjs");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
+const { requireMember, requireCapability, hasCapability, roleFor, INVITABLE_ROLES } = require("../middleware/authorize");
+const { sanitizeLifeSpace } = require("../serialize");
 
 const router = express.Router();
-
-// Never send the passcode hash to the client; expose only whether one is set.
-function sanitize(lifeSpace) {
-  const { passcode_hash, ...rest } = lifeSpace;
-  return { ...rest, hasPasscode: !!passcode_hash };
-}
 
 function slugify(title) {
   return (
@@ -24,14 +20,15 @@ function slugify(title) {
   );
 }
 
-// List life spaces the current user owns or is a team member of
+// List life spaces the current user owns or is a team member of, each
+// tagged with the caller's role so the frontend can gate actions per space.
 router.get("/", requireAuth, (req, res) => {
-  const memberships = db.table("team_members").where((m) => m.user_id === req.user.id);
-  const memberSpaceIds = new Set(memberships.map((m) => m.life_space_id));
-  const spaces = db.table("life_spaces").where(
-    (s) => s.owner_id === req.user.id || memberSpaceIds.has(s.id)
-  );
-  res.json({ lifeSpaces: spaces.map(sanitize) });
+  const mine = db
+    .table("life_spaces")
+    .all()
+    .map((space) => ({ space, role: roleFor(space, req.user.id) }))
+    .filter((x) => x.role);
+  res.json({ lifeSpaces: mine.map(({ space, role }) => sanitizeLifeSpace(space, role)) });
 });
 
 router.post("/", requireAuth, (req, res) => {
@@ -64,16 +61,25 @@ router.post("/", requireAuth, (req, res) => {
     role: "owner",
     invited_at: new Date().toISOString(),
   });
-  res.status(201).json({ lifeSpace: sanitize(lifeSpace) });
+  res.status(201).json({ lifeSpace: sanitizeLifeSpace(lifeSpace, "owner") });
 });
 
-router.get("/:id", requireAuth, (req, res) => {
-  const lifeSpace = db.table("life_spaces").find(req.params.id);
-  if (!lifeSpace) return res.status(404).json({ error: "Life space not found" });
-  res.json({ lifeSpace: sanitize(lifeSpace) });
+router.get("/:id", requireAuth, requireMember("id"), (req, res) => {
+  res.json({ lifeSpace: sanitizeLifeSpace(req.lifeSpace, req.role) });
 });
 
-router.patch("/:id", requireAuth, (req, res) => {
+// Sensitive fields (visibility, showBudgetPublic, allowIndexing, passcode)
+// require the stricter owner-only capability; everything else only requires
+// lifespace:edit_settings. A request touching both is held to the stricter
+// bar for the whole request rather than partially applying.
+router.patch("/:id", requireAuth, requireMember("id"), (req, res) => {
+  const sensitiveKeys = ["visibility", "showBudgetPublic", "allowIndexing", "passcode"];
+  const touchesSensitive = sensitiveKeys.some((key) => req.body[key] !== undefined);
+  const neededCapability = touchesSensitive ? "lifespace:edit_visibility" : "lifespace:edit_settings";
+  if (!hasCapability(req.role, neededCapability)) {
+    return res.status(403).json({ error: "Your role does not allow this action" });
+  }
+
   const allowed = ["title", "story", "goalAmount", "theme", "visibility", "showBudgetPublic", "allowIndexing", "coverImage", "status"];
   const columnMap = { goalAmount: "goal_amount", showBudgetPublic: "show_budget_public", allowIndexing: "allow_indexing", coverImage: "cover_image" };
   const patch = {};
@@ -87,17 +93,16 @@ router.patch("/:id", requireAuth, (req, res) => {
     patch.passcode_hash = req.body.passcode ? bcrypt.hashSync(String(req.body.passcode), 10) : null;
   }
   const updated = db.table("life_spaces").update(req.params.id, patch);
-  if (!updated) return res.status(404).json({ error: "Life space not found" });
-  res.json({ lifeSpace: sanitize(updated) });
+  res.json({ lifeSpace: sanitizeLifeSpace(updated, req.role) });
 });
 
-router.delete("/:id", requireAuth, (req, res) => {
+router.delete("/:id", requireAuth, requireCapability("lifespace:delete", "id"), (req, res) => {
   db.table("life_spaces").remove(req.params.id);
   res.status(204).end();
 });
 
 // Team
-router.get("/:id/team", requireAuth, (req, res) => {
+router.get("/:id/team", requireAuth, requireMember("id"), (req, res) => {
   const members = db.table("team_members").where((m) => m.life_space_id === req.params.id);
   const users = db.table("users").all();
   const withNames = members.map((m) => {
@@ -107,18 +112,37 @@ router.get("/:id/team", requireAuth, (req, res) => {
   res.json({ team: withNames });
 });
 
-router.post("/:id/team", requireAuth, (req, res) => {
-  const { email, role } = req.body;
-  const user = db.table("users").where((u) => u.email.toLowerCase() === (email || "").toLowerCase())[0];
-  if (!user) return res.status(404).json({ error: "No user found with that email" });
-  const member = db.table("team_members").insert({
-    id: uuid(),
-    life_space_id: req.params.id,
-    user_id: user.id,
-    role: role || "volunteer",
-    invited_at: new Date().toISOString(),
-  });
-  res.status(201).json({ member });
+// Adding a new member now goes through the pending-invitation lifecycle
+// (see routes/invitations.js: POST /lifespaces/:id/invitations) instead of
+// this granting membership immediately — a real invite flow needs a state
+// the invitee can accept or decline, which immediate grant can't represent.
+
+router.patch("/:id/team/:memberId", requireAuth, requireCapability("team:manage", "id"), (req, res) => {
+  const { role } = req.body;
+  if (!role || !INVITABLE_ROLES.includes(role)) {
+    return res.status(400).json({ error: `role must be one of: ${INVITABLE_ROLES.join(", ")}` });
+  }
+  const member = db.table("team_members").find(req.params.memberId);
+  if (!member || member.life_space_id !== req.params.id) {
+    return res.status(404).json({ error: "Team member not found" });
+  }
+  if (member.user_id === req.lifeSpace.owner_id) {
+    return res.status(403).json({ error: "The life space owner's role cannot be changed" });
+  }
+  const updated = db.table("team_members").update(member.id, { role });
+  res.json({ member: updated });
+});
+
+router.delete("/:id/team/:memberId", requireAuth, requireCapability("team:manage", "id"), (req, res) => {
+  const member = db.table("team_members").find(req.params.memberId);
+  if (!member || member.life_space_id !== req.params.id) {
+    return res.status(404).json({ error: "Team member not found" });
+  }
+  if (member.user_id === req.lifeSpace.owner_id) {
+    return res.status(403).json({ error: "The life space owner cannot be removed" });
+  }
+  db.table("team_members").remove(member.id);
+  res.status(204).end();
 });
 
 module.exports = router;
