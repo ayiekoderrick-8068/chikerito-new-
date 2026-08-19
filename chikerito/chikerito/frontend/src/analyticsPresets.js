@@ -1,30 +1,34 @@
-function iso(date) {
-  return date.toISOString().slice(0, 10);
+function calendarDate(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
-function utcDate(value) {
+function localDate(value) {
   if (value instanceof Date) return new Date(value.getTime());
-  return new Date(`${value}T00:00:00Z`);
+  return new Date(`${value}T00:00:00`);
 }
 
 export function shiftDays(value, amount) {
-  const date = utcDate(value);
-  date.setUTCDate(date.getUTCDate() + amount);
-  return iso(date);
+  const date = localDate(value);
+  date.setDate(date.getDate() + amount);
+  return calendarDate(date);
 }
 
 export function startOfMonth(value) {
-  const date = utcDate(value);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  const date = localDate(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
 export function startOfYear(value) {
-  const date = utcDate(value);
-  return `${date.getUTCFullYear()}-01-01`;
+  const date = localDate(value);
+  return `${date.getFullYear()}-01-01`;
 }
 
 export function analyticsPreset(name, today = new Date()) {
-  const to = iso(utcDate(today));
+  const to = calendarDate(localDate(today));
   switch (name) {
     case "this-month":
       return { from: startOfMonth(to), to };

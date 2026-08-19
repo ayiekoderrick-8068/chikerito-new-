@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Analytics from "../../src/pages/Analytics.jsx";
 import { api } from "../../src/api";
@@ -62,6 +62,13 @@ describe("Analytics v2", () => {
   it("renders period activity details", async () => {
     renderPage(); const summary = await screen.findByRole("region", { name: /period activity summary/i });
     expect(summary).toHaveTextContent("Expenses3"); expect(summary).toHaveTextContent("Contributions2"); expect(summary).toHaveTextContent("Largest expense$200.00"); expect(summary).toHaveTextContent("Uncategorized spend$25.00");
+  });
+
+  it("renders the expense-count comparison in the period summary", async () => {
+    api.getAnalytics.mockResolvedValue({ analytics: { ...analytics, comparison: { changes: { spent: 25, raised: -10, net: 0, expenseCount: 50 } } } });
+    renderPage();
+    const summary = await screen.findByRole("region", { name: /period activity summary/i });
+    expect(summary).toHaveTextContent("+50% vs previous period");
   });
 
   it("renders a daily average for bounded responses", async () => {
@@ -142,19 +149,19 @@ describe("Analytics v2", () => {
 
   it("fills this-month dates from the current UTC date", async () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-08-18T12:00:00Z")); renderPage();
-    await vi.runAllTimersAsync(); fireEvent.click(screen.getByRole("button", { name: "This month" }));
+    await act(async () => { await vi.runAllTimersAsync(); }); fireEvent.click(screen.getByRole("button", { name: "This month" }));
     expect(screen.getByLabelText("From")).toHaveValue("2026-08-01"); expect(screen.getByLabelText("To")).toHaveValue("2026-08-18"); vi.useRealTimers();
   });
 
   it("fills an inclusive last-30-days range", async () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-08-18T12:00:00Z")); renderPage();
-    await vi.runAllTimersAsync(); fireEvent.click(screen.getByRole("button", { name: "Last 30 days" }));
+    await act(async () => { await vi.runAllTimersAsync(); }); fireEvent.click(screen.getByRole("button", { name: "Last 30 days" }));
     expect(screen.getByLabelText("From")).toHaveValue("2026-07-20"); expect(screen.getByLabelText("To")).toHaveValue("2026-08-18"); vi.useRealTimers();
   });
 
   it("fills a year-to-date range", async () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-08-18T12:00:00Z")); renderPage();
-    await vi.runAllTimersAsync(); fireEvent.click(screen.getByRole("button", { name: "Year to date" }));
+    await act(async () => { await vi.runAllTimersAsync(); }); fireEvent.click(screen.getByRole("button", { name: "Year to date" }));
     expect(screen.getByLabelText("From")).toHaveValue("2026-01-01"); expect(screen.getByLabelText("To")).toHaveValue("2026-08-18"); vi.useRealTimers();
   });
 

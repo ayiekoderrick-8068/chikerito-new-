@@ -24,6 +24,7 @@ const EMPTY = {
   recurring_expenses: [],
   tasks: [],
   notifications: [],
+  audit_logs: [],
 };
 
 const TABLES = Object.keys(EMPTY);

@@ -71,7 +71,7 @@ export default function Analytics() {
           <MetricCard label="Budget remaining" value={money(data.summary.variance)} /><MetricCard label="Average expense" value={money(data.summary.averageExpense)} />
         </div>
         <section className="card analytics-period-summary" aria-label="Period activity summary">
-          <div><span>Expenses</span><strong>{data.summary.expenseCount}</strong></div>
+          <div><span>Expenses</span><strong>{data.summary.expenseCount}</strong>{data.comparison && <small className="analytics-change">{changeLabel(data.comparison.changes.expenseCount)}</small>}</div>
           <div><span>Contributions</span><strong>{data.summary.contributionCount}</strong></div>
           <div><span>Largest expense</span><strong>{money(data.summary.largestExpense)}</strong></div>
           <div><span>Largest contribution</span><strong>{money(data.summary.largestContribution)}</strong></div>

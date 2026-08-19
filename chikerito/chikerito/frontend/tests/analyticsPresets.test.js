@@ -13,6 +13,10 @@ describe("analytics date presets", () => {
   it("builds this-month range", () => expect(analyticsPreset("this-month", today)).toEqual({ from: "2026-08-01", to: "2026-08-18" }));
   it("builds an inclusive 30-day range", () => expect(analyticsPreset("last-30-days", today)).toEqual({ from: "2026-07-20", to: "2026-08-18" }));
   it("builds year-to-date range", () => expect(analyticsPreset("year-to-date", today)).toEqual({ from: "2026-01-01", to: "2026-08-18" }));
+  it("uses the local calendar date near a UTC boundary", () => {
+    const localEarlyMorning = new Date(2026, 7, 18, 1, 30);
+    expect(analyticsPreset("this-month", localEarlyMorning).to).toBe("2026-08-18");
+  });
   it("builds all-time range", () => expect(analyticsPreset("all-time", today)).toEqual({ from: "", to: "" }));
   it("rejects unknown presets", () => expect(() => analyticsPreset("quarter", today)).toThrow("Unknown analytics preset"));
   it("labels all-time ranges", () => expect(rangeLabel({ from: null, to: null })).toBe("All time"));

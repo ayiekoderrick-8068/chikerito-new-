@@ -131,6 +131,16 @@ export const api = {
   markAllNotificationsRead: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/notifications/mark-all-read`, { method: "POST" }),
   setNotificationRead: (id, read) => request(`/notifications/${id}`, { method: "PATCH", body: { read } }),
   deleteNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
+
+  listAuditLogs: (lifeSpaceId, filters = {}) => {
+    const params = new URLSearchParams();
+    for (const key of ["action", "resourceType", "actorId", "from", "to", "cursor", "limit"]) {
+      if (filters[key]) params.set(key, filters[key]);
+    }
+    const query = params.toString();
+    return request(`/lifespaces/${lifeSpaceId}/audit-logs${query ? `?${query}` : ""}`);
+  },
+  getAuditFilterOptions: (lifeSpaceId) => request(`/lifespaces/${lifeSpaceId}/audit-logs/filter-options`),
 };
 
 export { getToken };
